@@ -6,11 +6,20 @@ use App\Enums\EnforcementAction;
 use App\Enums\RequestKind;
 use App\Enums\Severity;
 use App\Enums\UserRole;
+use App\Http\Requests\Concerns\NormalisesClientTimestamps;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 class StoreWebEventRequest extends FormRequest
 {
+    use NormalisesClientTimestamps;
+
+    /** Client timestamps arrive in UTC; store them in the application timezone. */
+    protected function prepareForValidation(): void
+    {
+        $this->normaliseTimestamps(['occurred_at']);
+    }
+
     public function authorize(): bool
     {
         return $this->user()?->hasRole(UserRole::Service) ?? false;

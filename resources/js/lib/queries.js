@@ -225,6 +225,18 @@ export const useClassroomLive = (params, options) =>
         ...options,
     });
 
+/**
+ * A learner's browsing history. Only fetched when a drawer is actually open —
+ * this is sensitive data about a named child, so it is not pre-loaded for
+ * every tile on the page.
+ */
+export const useWebEvents = (params, options) =>
+    useQuery({
+        queryKey: ['web-events', params],
+        queryFn: ({ signal }) => api.webEvents(params, signal).then((p) => p),
+        ...options,
+    });
+
 export const useClassroomPushUrl = () =>
     useInvalidatingMutation((body) => api.classrooms.pushUrl(body), ['classrooms-live']);
 

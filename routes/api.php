@@ -135,6 +135,8 @@ Route::prefix('v1')->name('api.v1.')->group(function (): void {
 
                 Route::middleware('role:hoi,clm')->group(function (): void {
                     Route::get('classrooms/live', [ClassroomLiveController::class, 'index'])->name('classrooms.live');
+                    // Learner browsing history. Recorded since day one, readable now.
+                    Route::get('web-events', [WebEventController::class, 'index'])->name('web-events.index');
                     Route::post('classrooms/push-url', [ClassroomLiveController::class, 'pushUrl'])->name('classrooms.push-url');
                     Route::post('classrooms/nudge', [ClassroomLiveController::class, 'nudge'])->name('classrooms.nudge');
                     Route::post('classrooms/focus-mode', [ClassroomLiveController::class, 'focusMode'])->name('classrooms.focus-mode');

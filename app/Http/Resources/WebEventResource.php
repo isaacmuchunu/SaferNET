@@ -21,6 +21,9 @@ class WebEventResource extends JsonResource
             'enforcement_source' => $this->enforcement_source,
             'severity' => $this->severity,
             'reason' => $this->reason,
+            'category' => $this->whenLoaded('category', fn () => $this->category?->name),
+            'learner_name' => $this->whenLoaded('learner', fn () => trim($this->learner->first_name.' '.$this->learner->last_name)),
+            'page_title' => data_get($this->metadata, 'page_title'),
             'occurred_at' => $this->occurred_at,
             'incident' => new IncidentResource($this->whenLoaded('incident')),
         ];

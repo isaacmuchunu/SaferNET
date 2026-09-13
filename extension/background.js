@@ -267,6 +267,56 @@ async function broadcastToTabs(message) {
     .map((tab) => chrome.tabs.sendMessage(tab.id, message).catch(() => null)));
 }
 
+/**
+ * Whether the school's policy blocks a URL, using the cached policy.
+ *
+ * An approved exception outranks a parent-domain entry on an upstream list, so
+ * the allowlist is consulted first and settles the question when it hits.
+ */
+function policyBlocks(url, config) {
+  let hostname;
+
+  try {
+    hostname = new URL(url).hostname;
+  } catch (_) {
+    return false;
+  }
+
+  const covers = (entry) => hostname === entry || hostname.endsWith(`.${entry}`);
+
+  if ((config.allowed_domains || []).some(covers)) return false;
+
+  return (config.blocked_domains || []).some(covers);
+}
+
+// The last page view recorded per tab, so one navigation is not recorded twice
+// when onUpdated and onActivated both fire for it.
+const lastPageView = new Map();
+const PAGE_VIEW_DEBOUNCE_MS = 4000;
+
+/**
+ * Records a page the learner actually reached.
+ *
+ * A blocked navigation is recorded once, by the navigation handler, as a block.
+ * Recording it again here would put an "allowed" row for a blocked site in the
+ * learner's history — the opposite of what happened, in the record most likely
+ * to be read back during a safeguarding conversation.
+ */
+async function recordPageView(tabId, url, title) {
+  const config = await chrome.storage.local.get(['blocked_domains', 'allowed_domains']);
+  if (policyBlocks(url, config)) return;
+
+  const previous = lastPageView.get(tabId);
+  const now = Date.now();
+
+  if (previous && previous.url === url && now - previous.at < PAGE_VIEW_DEBOUNCE_MS) return;
+
+  lastPageView.set(tabId, { url, at: now });
+  await queueTelemetry(url, title);
+}
+
+chrome.tabs.onRemoved.addListener((tabId) => lastPageView.delete(tabId));
+
 chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
   if (details.frameId !== 0 || !isWebUrl(details.url)) return;
 
@@ -284,15 +334,7 @@ chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
       }
     }
 
-    // An approved exception outranks a parent-domain entry on an upstream list,
-    // so the allowlist is consulted first and settles the question when it hits.
-    const covers = (entry) =>
-      destination.hostname === entry || destination.hostname.endsWith(`.${entry}`);
-
-    const allowed = (config.allowed_domains || []).some(covers);
-    const blocked = !allowed && (config.blocked_domains || []).some(covers);
-
-    if (blocked) {
+    if (policyBlocks(details.url, config)) {
       queueTelemetry(details.url, '', 'block', 'County policy domain block');
       const blockUrl = chrome.runtime.getURL('blocked.html')
         + `?url=${encodeURIComponent(details.url)}&category=Restricted+Domain&rule=County+Policy+Block`;
@@ -306,13 +348,13 @@ chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
 chrome.tabs.onActivated.addListener(async ({ tabId }) => {
   try {
     const tab = await chrome.tabs.get(tabId);
-    if (isWebUrl(tab.url)) await queueTelemetry(tab.url, tab.title || '');
+    if (isWebUrl(tab.url)) await recordPageView(tabId, tab.url, tab.title || '');
   } catch (_) {}
 });
 
-chrome.tabs.onUpdated.addListener(async (_tabId, changeInfo, tab) => {
+chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
   if (changeInfo.status === 'complete' && isWebUrl(tab.url)) {
-    await queueTelemetry(tab.url, tab.title || '');
+    await recordPageView(tabId, tab.url, tab.title || '');
   }
 });
 

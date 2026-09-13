@@ -3,11 +3,20 @@
 namespace App\Http\Requests\Api\V1;
 
 use App\Enums\UserRole;
+use App\Http\Requests\Concerns\NormalisesClientTimestamps;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 
 class StoreProtectionComponentRequest extends FormRequest
 {
+    use NormalisesClientTimestamps;
+
+    /** Client timestamps arrive in UTC; store them in the application timezone. */
+    protected function prepareForValidation(): void
+    {
+        $this->normaliseTimestamps(['policy_synced_at']);
+    }
+
     /**
      * Determine if the user is authorized to make this request.
      */

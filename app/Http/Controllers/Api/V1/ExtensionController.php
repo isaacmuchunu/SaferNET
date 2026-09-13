@@ -161,7 +161,11 @@ class ExtensionController extends Controller
             }
         }
 
-        $lastSyncedAt = isset($validated['last_synced_at']) ? Carbon::parse($validated['last_synced_at']) : null;
+        // Clients report in UTC and these columns carry no timezone, so the
+        // value is converted before it is stored or compared against now().
+        $lastSyncedAt = isset($validated['last_synced_at'])
+            ? Carbon::parse($validated['last_synced_at'])->setTimezone(config('app.timezone'))
+            : null;
 
         $component = ProtectionComponent::query()->updateOrCreate(
             [
