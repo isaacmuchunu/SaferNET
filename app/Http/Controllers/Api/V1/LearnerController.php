@@ -12,6 +12,7 @@ use App\Support\Tenancy\TenantContext;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Response;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Hash;
 
@@ -76,11 +77,17 @@ class LearnerController extends Controller
                 ->limit(5),
         ]);
 
+        // max() returns the raw column and so bypasses the datetime cast, which
+        // would hand the client a timezone-less string while every other
+        // timestamp in the API is ISO-8601 UTC. A viewer in another timezone
+        // would read it hours out.
+        $lastSeenAt = $learner->webEvents()->max('occurred_at');
+
         $learner->setAttribute('activity', [
             'events' => $learner->webEvents()->count(),
             'blocked' => $learner->webEvents()->where('action', EnforcementAction::Block->value)->count(),
             'open_incidents' => $learner->incidents()->whereIn('status', ['open', 'under_review'])->count(),
-            'last_seen_at' => $learner->webEvents()->max('occurred_at'),
+            'last_seen_at' => $lastSeenAt === null ? null : Carbon::parse($lastSeenAt)->toISOString(),
         ]);
 
         return new DomainResource($learner);

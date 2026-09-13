@@ -28,7 +28,7 @@ import {
     TextInput,
     firstError,
 } from '../components/Primitives';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { ConfirmDialog, Drawer } from '../components/Overlays';
 import { BrowsingHistory } from '../components/BrowsingHistory';
 import { StatusPill } from '../components/StatusPill';
@@ -78,6 +78,7 @@ export function DevicesPage() {
     const search = useDebouncedValue(list.values.search, 300);
 
     const [selected, setSelected] = useState(null);
+    const [searchParams, setSearchParams] = useSearchParams();
     const [editing, setEditing] = useState(null);
 
     const devices = useDevices({
@@ -92,6 +93,20 @@ export function DevicesPage() {
     const all = devices.data?.data ?? [];
     // The API has no unattributed filter, so this narrows the current page only.
     const rows = list.values.attribution === 'required' ? all.filter((device) => (device.assigned_learners?.length ?? 0) === 0) : all;
+    // A school page links here with ?device=<id>; open that record once it is
+    // available, then clear the parameter so a refresh is not sticky.
+    const requestedDevice = searchParams.get('device');
+    useEffect(() => {
+        if (!requestedDevice) return;
+
+        const match = rows.find((device) => String(device.id) === requestedDevice);
+        if (!match) return;
+
+        setSelected(match);
+        searchParams.delete('device');
+        setSearchParams(searchParams, { replace: true });
+    }, [requestedDevice, rows, searchParams, setSearchParams]);
+
     const selectedDevice = selected ? (all.find((device) => device.id === selected.id) ?? selected) : null;
 
     return (

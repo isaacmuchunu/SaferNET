@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { GlobeIcon } from 'lucide-react';
 import { EmptyState, FilterSelect, SearchInput, Skeleton } from './Primitives';
 import { useWebEvents } from '../lib/queries';
@@ -16,11 +16,20 @@ const PERIODS = [
     ['30', 'Last 30 days'],
 ];
 
-/** Days back, as the ISO instant the API expects. */
+/**
+ * Days back, as the ISO instant the API expects, rounded down to the minute.
+ *
+ * The rounding is what makes it usable as part of a query key. Computed to the
+ * millisecond it changes on every render, so the key changes, which refetches,
+ * which re-renders — a loop that never settles and hammers the API. A minute's
+ * granularity is far finer than any period offered here.
+ */
 function since(days) {
     if (!days) return undefined;
 
-    return new Date(Date.now() - Number(days) * 86_400_000).toISOString();
+    const instant = Date.now() - Number(days) * 86_400_000;
+
+    return new Date(Math.floor(instant / 60_000) * 60_000).toISOString();
 }
 
 /**
@@ -38,14 +47,22 @@ export function BrowsingHistory({ learnerId, sessionId, deviceId, emptyHint }) {
     const [period, setPeriod] = useState('7');
     const [search, setSearch] = useState('');
 
-    const history = useWebEvents({
-        ...(learnerId ? { learner_id: learnerId } : {}),
-        ...(sessionId ? { learner_session_id: sessionId } : {}),
-        ...(deviceId ? { device_id: deviceId } : {}),
-        ...(action ? { action } : {}),
-        ...(search ? { search } : {}),
-        ...(since(period) ? { since: since(period) } : {}),
-    });
+    // Memoised so the query key is stable between renders: an unstable key is
+    // what turned this panel into a request loop.
+    const params = useMemo(() => {
+        const from = since(period);
+
+        return {
+            ...(learnerId ? { learner_id: learnerId } : {}),
+            ...(sessionId ? { learner_session_id: sessionId } : {}),
+            ...(deviceId ? { device_id: deviceId } : {}),
+            ...(action ? { action } : {}),
+            ...(search ? { search } : {}),
+            ...(from ? { since: from } : {}),
+        };
+    }, [learnerId, sessionId, deviceId, action, search, period]);
+
+    const history = useWebEvents(params);
 
     const events = history.data?.data ?? [];
     const total = history.data?.meta?.total ?? 0;

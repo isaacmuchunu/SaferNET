@@ -245,7 +245,7 @@ export function LaboratoriesPage() {
                         }
                     >
                         {labs.map((laboratory) => (
-                            <Row key={laboratory.id}>
+                            <Row key={laboratory.id} onClick={() => setEditing(laboratory)}>
 
                                 <Cell>
                                     <div className="flex items-center gap-3">

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import clsx from 'clsx';
 import { GavelIcon, MailIcon, PhoneIcon } from 'lucide-react';
 import { PageHeader } from '../components/PageHeader';
@@ -36,6 +36,7 @@ const TABS = ['Overview', 'Learners', 'Devices', 'Laboratories', 'Incidents', 'A
 
 export function SchoolPage() {
     const { schoolId } = useParams();
+    const navigate = useNavigate();
     const { user } = useAuth();
     const can = capabilitiesFor(user?.role);
     const scope = useScope();
@@ -184,7 +185,7 @@ export function SchoolPage() {
                         empty={<EmptyState title="No learners enrolled" description="This school has not imported its learner register yet." />}
                     >
                         {(learners.data?.data ?? []).map((learner) => (
-                            <Row key={learner.id}>
+                            <Row key={learner.id} onClick={() => navigate(`/learners?learner=${learner.id}`)}>
                                 <Cell mono>{learner.learner_number}</Cell>
                                 <Cell bold>
                                     {learner.first_name} {learner.last_name}
@@ -208,7 +209,7 @@ export function SchoolPage() {
                         empty={<EmptyState title="No devices enrolled" description="No computers have been enrolled for this school." />}
                     >
                         {(devices.data?.data ?? []).map((device) => (
-                            <Row key={device.id}>
+                            <Row key={device.id} onClick={() => navigate(`/devices?device=${device.id}`)}>
                                 <Cell mono bold>
                                     {device.asset_tag}
                                 </Cell>
@@ -241,7 +242,7 @@ export function SchoolPage() {
                         empty={<EmptyState title="No laboratories recorded" description="Add a laboratory before enrolling devices." />}
                     >
                         {(laboratories.data?.data ?? []).map((laboratory) => (
-                            <Row key={laboratory.id}>
+                            <Row key={laboratory.id} onClick={() => navigate('/laboratories')}>
                                 <Cell bold>{laboratory.name}</Cell>
                                 <Cell muted>{laboratory.location ?? '—'}</Cell>
                                 <Cell align="right" className="tabular-nums">
@@ -264,7 +265,7 @@ export function SchoolPage() {
                         empty={<EmptyState title="No incidents raised" description="No learner activity at this school has met an incident threshold." />}
                     >
                         {(incidents.data?.data ?? []).map((incident) => (
-                            <Row key={incident.id}>
+                            <Row key={incident.id} onClick={() => navigate(`/incidents/${incident.public_id ?? incident.id}`)}>
                                 <Cell mono>
                                     <Link to={`/incidents/${incident.id}`} className="font-semibold text-brand hover:underline">
                                         {incident.id.slice(0, 8).toUpperCase()}
@@ -296,7 +297,7 @@ export function SchoolPage() {
                         empty={<EmptyState title="No officers enrolled" description="No Head of Institution or Laboratory Manager has been provisioned." />}
                     >
                         {(administrators.data?.data ?? []).map((officer) => (
-                            <Row key={officer.id}>
+                            <Row key={officer.id} onClick={() => navigate('/administrators')}>
                                 <Cell bold>{officer.name}</Cell>
                                 <Cell muted>{roleLabel(officer.role)}</Cell>
                                 <Cell>{officer.email}</Cell>
