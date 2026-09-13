@@ -97,7 +97,7 @@ export function AdministratorsPage() {
                     empty={<EmptyState icon={UsersRoundIcon} title="No officer accounts" description="Provision the officers who will administer SAFERNET." />}
                 >
                     {rows.map((officer) => (
-                        <Row key={officer.id}>
+                        <Row key={officer.id} onClick={() => setEditing(officer)}>
                             <Cell>
                                 <span className="flex items-center gap-3">
                                     <UserAvatar user={officer} size="md" />
@@ -117,7 +117,7 @@ export function AdministratorsPage() {
                                 />
                             </Cell>
                             <Cell align="right">
-                                <div className="flex justify-end gap-1">
+                                <div className="flex justify-end gap-1" onClick={(event) => event.stopPropagation()}>
                                     <Button size="sm" variant="ghost" icon={PencilIcon} onClick={() => setEditing(officer)}>
                                         Edit
                                     </Button>
