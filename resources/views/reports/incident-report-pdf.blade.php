@@ -28,6 +28,7 @@
         .records th { background: #f1f5f9; font: bold 6pt "Times New Roman", Times, serif; letter-spacing: .02em; text-align: left; text-transform: uppercase; }
         .empty { padding: 3mm !important; color: #475569; font-style: italic; text-align: center; }
         .note { margin: 2mm 0 0; font-size: 8pt; color: #475569; font-style: italic; }
+        .evidence-heading { margin: 3mm 0 1.5mm; font-size: 9pt; font-weight: bold; color: #0f172a; }
         .declaration { padding: 1.5mm 2mm; border: .6pt solid #64748b; border-top: 0; }
         .signatures td { height: 20mm; padding: 1.5mm 2mm; border: .6pt solid #64748b; vertical-align: top; font-weight: bold; text-transform: uppercase; }
         .line { margin-top: 11mm; padding-top: 1mm; border-top: .6pt solid #111827; color: #475569; font-size: 5.7pt; font-weight: normal; text-align: center; text-transform: none; }
@@ -120,29 +121,60 @@
 
     <section class="section">
         <div class="section-title">Part V - Supporting web-event evidence</div>
+
+        <p class="note" style="margin-top:0">
+            Ordered by {{ ['occurred_at' => 'time', 'domain' => 'domain', 'action' => 'action'][$sortedBy] ?? 'time' }},
+            {{ $sortDirection === 'asc' ? 'earliest first' : 'most recent first' }}.
+        </p>
+
+        <div class="evidence-heading">V(a) - Activity linked to this incident by SAFERNET</div>
         <table class="records">
             <thead><tr><th style="width: 14%">Occurred</th><th style="width: 22%">Domain</th><th style="width: 10%">Action</th><th style="width: 12%">Source</th><th>Reason / URL</th></tr></thead>
             <tbody>
-            @forelse($incident->webEvents as $event)
+            @forelse($linkedEvents as $event)
                 <tr><td class="mono">{{ $event->occurred_at?->format('d M H:i:s') ?? 'Not recorded' }}</td><td class="mono">{{ $event->domain }}</td><td>{{ strtoupper($event->action instanceof \BackedEnum ? $event->action->value : (string) $event->action) }}</td><td>{{ strtoupper($event->enforcement_source) }}</td><td>{{ $event->reason }}<br><span class="mono">{{ $event->url }}</span></td></tr>
             @empty
                 <tr><td colspan="5" class="empty">No web-event evidence is linked to this incident.</td></tr>
             @endforelse
             </tbody>
         </table>
-        @if($incident->web_events_count > $incident->webEvents->count())
+        @if($incident->web_events_count > $linkedEvents->count())
             {{-- An extract must announce itself: a reader signing Part VI has to
                  know the record continues beyond what is printed here. --}}
             <p class="note">
-                Extract: the {{ $incident->webEvents->count() }} most recent of
-                {{ number_format($incident->web_events_count) }} recorded events are shown.
+                Extract: the {{ $linkedEvents->count() }} most relevant of
+                {{ number_format($incident->web_events_count) }} linked events are shown.
                 The complete record is retained in SAFERNET and available on request.
             </p>
-        @elseif($incident->webEvents->count() > 0)
+        @elseif($linkedEvents->count() > 0)
             <p class="note">
-                Complete: all {{ number_format($incident->web_events_count) }} recorded events for this
-                incident are shown.
+                Complete: all {{ number_format($incident->web_events_count) }}
+                {{ Str::plural('linked event', $incident->web_events_count) }} for this incident
+                {{ $incident->web_events_count === 1 ? 'is' : 'are' }} shown.
             </p>
+        @endif
+
+        @if($addedEvents->isNotEmpty())
+            <div class="evidence-heading" style="margin-top:5mm">
+                V(b) - Additional context selected by the preparing officer
+            </div>
+            {{-- Kept apart from V(a) on purpose. These were chosen by a person,
+                 not linked by the platform, and a reader must be able to tell a
+                 preparer's judgement from the system's finding. --}}
+            <p class="note" style="margin-top:0">
+                The {{ $addedEvents->count() }} {{ Str::plural('record', $addedEvents->count()) }} below
+                {{ $addedEvents->count() === 1 ? 'was' : 'were' }} selected by {{ $actor->name }} as
+                relevant surrounding activity for the same learner, and
+                {{ $addedEvents->count() === 1 ? 'was' : 'were' }} not linked to this incident by SAFERNET.
+            </p>
+            <table class="records">
+                <thead><tr><th style="width: 14%">Occurred</th><th style="width: 22%">Domain</th><th style="width: 10%">Action</th><th style="width: 12%">Source</th><th>Reason / URL</th></tr></thead>
+                <tbody>
+                @foreach($addedEvents as $event)
+                    <tr><td class="mono">{{ $event->occurred_at?->format('d M H:i:s') ?? 'Not recorded' }}</td><td class="mono">{{ $event->domain }}</td><td>{{ strtoupper($event->action instanceof \BackedEnum ? $event->action->value : (string) $event->action) }}</td><td>{{ strtoupper($event->enforcement_source) }}</td><td>{{ $event->reason }}<br><span class="mono">{{ $event->url }}</span></td></tr>
+                @endforeach
+                </tbody>
+            </table>
         @endif
     </section>
 

@@ -19,12 +19,13 @@ import {
     firstError,
 } from '../components/Primitives';
 import { StatusPill } from '../components/StatusPill';
+import { PrepareDossierModal } from './incidents/PrepareDossierModal';
 import { useIncident, useRecordIncidentAction, useUpdateIncident, useUsers } from '../lib/queries';
 import { capabilitiesFor } from '../lib/permissions';
 import { useAuth } from '../lib/auth';
 import { ENFORCEMENT_ACTION, INCIDENT_STATUS, SEVERITY } from '../lib/domain';
 import { formatDate, formatRelative } from '../lib/format';
-import { ApiError, api } from '../lib/api';
+import { ApiError } from '../lib/api';
 import { showToast, toastError } from '../lib/toast';
 
 const ACTIONS = [
@@ -38,6 +39,7 @@ const ACTIONS = [
 ];
 
 export function IncidentPage() {
+    const [preparing, setPreparing] = useState(false);
     const { incidentId } = useParams();
     const { user } = useAuth();
     const can = capabilitiesFor(user?.role);
@@ -117,30 +119,9 @@ export function IncidentPage() {
                             type="button"
                             variant="secondary"
                             icon={PrinterIcon}
-                            onClick={async () => {
-                                const reportWindow = window.open('about:blank', '_blank');
-
-                                if (!reportWindow) {
-                                    showToast('Allow pop-ups to print the dossier', { tone: 'warning' });
-                                    return;
-                                }
-
-                                reportWindow.opener = null;
-                                reportWindow.document.title = 'Preparing safeguarding dossier...';
-                                reportWindow.document.body.textContent = 'Preparing safeguarding dossier...';
-
-                                try {
-                                    const pdf = await api.incidentReport(data.id);
-                                    const url = URL.createObjectURL(pdf);
-                                    reportWindow.location.replace(url);
-                                    window.setTimeout(() => URL.revokeObjectURL(url), 120000);
-                                } catch (error) {
-                                    reportWindow.close();
-                                    toastError(error, 'The incident dossier could not be prepared');
-                                }
-                            }}
+                            onClick={() => setPreparing(true)}
                         >
-                            Open PDF dossier
+                            Prepare dossier
                         </Button>
                         <StatusPill descriptor={SEVERITY[data.severity]} />
                         <StatusPill descriptor={INCIDENT_STATUS[data.status]} />
@@ -334,6 +315,12 @@ export function IncidentPage() {
                     )}
                 </div>
             </div>
+
+            <PrepareDossierModal
+                incident={data}
+                open={preparing}
+                onClose={() => setPreparing(false)}
+            />
         </div>
     );
 }

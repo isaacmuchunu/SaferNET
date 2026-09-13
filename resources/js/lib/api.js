@@ -68,9 +68,23 @@ function buildUrl(path, query) {
     const url = new URL(`${BASE_URL}${path}`, window.location.origin);
 
     Object.entries(query ?? {}).forEach(([key, value]) => {
-        if (value !== undefined && value !== null && value !== '') {
-            url.searchParams.set(key, value);
+        if (value === undefined || value === null || value === '') {
+            return;
         }
+
+        // An array has to be appended one entry at a time as `key[]`, which is
+        // what PHP parses back into an array. `set` would stringify it to
+        // "a,b" and the server would reject a comma-joined string where it
+        // expects a list.
+        if (Array.isArray(value)) {
+            value
+                .filter((entry) => entry !== undefined && entry !== null && entry !== '')
+                .forEach((entry) => url.searchParams.append(`${key}[]`, entry));
+
+            return;
+        }
+
+        url.searchParams.set(key, value);
     });
 
     return url.toString();
@@ -236,7 +250,7 @@ export const api = {
     policyRules: (policyId) => resource(`/filtering-policies/${policyId}/rules`),
 
     incidents: resource('/incidents'),
-    incidentReport: (id, signal) => requestBlob(`/incidents/${id}/report`, { signal }),
+    incidentReport: (id, query, signal) => requestBlob(`/incidents/${id}/report`, { query, signal }),
     recordIncidentAction: (incidentId, body) => request(`/incidents/${incidentId}/actions`, { method: 'POST', body }),
 
     exceptionRequests: resource('/exception-requests'),
