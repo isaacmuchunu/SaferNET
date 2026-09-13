@@ -39,6 +39,7 @@ use App\Http\Controllers\Api\V1\SecurityEventController;
 use App\Http\Controllers\Api\V1\SubcountyController;
 use App\Http\Controllers\Api\V1\UserController;
 use App\Http\Controllers\Api\V1\WebEventController;
+use App\Http\Controllers\Api\V1\WorkstationSessionController;
 use App\Http\Resources\UserResource;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -75,6 +76,17 @@ Route::prefix('v1')->name('api.v1.')->group(function (): void {
                 Route::get('agent/resolve-device', [DeviceController::class, 'resolve'])->name('agent.resolve-device');
                 Route::get('extension/commands', [ExtensionController::class, 'commands'])->name('extension.commands');
                 Route::get('extension/session', [ExtensionController::class, 'session'])->name('extension.session');
+
+                /*
+                 | Learner sign-in at the workstation. Throttled far harder than
+                 | the rest of this group: a learner PIN is short, so the number
+                 | of guesses allowed is the only thing protecting it.
+                 */
+                Route::post('extension/sign-in', [WorkstationSessionController::class, 'signIn'])
+                    ->middleware('throttle:workstation-signin')
+                    ->name('extension.sign-in');
+                Route::post('extension/sign-out', [WorkstationSessionController::class, 'signOut'])
+                    ->name('extension.sign-out');
                 Route::post('extension/heartbeat', [ExtensionController::class, 'heartbeat'])->name('extension.heartbeat');
                 Route::post('extension/exception-requests', [ExtensionController::class, 'storeExceptionRequest'])
                     ->name('extension.exception-requests.store');
