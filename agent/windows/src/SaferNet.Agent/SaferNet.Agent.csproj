@@ -7,6 +7,10 @@
     <RootNamespace>SaferNet.Agent</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
+    <!-- Packet parsing is internal, but it is the part most worth testing directly. -->
+    <InternalsVisibleTo Include="SaferNet.Agent.Tests" />
+  </ItemGroup>
+  <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.0" />
     <PackageReference Include="Microsoft.Extensions.Options.DataAnnotations" Version="10.0.0" />
     <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="10.0.0" />

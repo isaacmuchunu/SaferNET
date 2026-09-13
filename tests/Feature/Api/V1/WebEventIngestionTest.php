@@ -52,6 +52,61 @@ class WebEventIngestionTest extends TestCase
         $this->assertDatabaseCount('incidents', 0);
     }
 
+    public function test_an_event_retried_after_its_session_closed_is_still_attributed(): void
+    {
+        Notification::fake();
+        [$user, $session, $category] = $this->attributedSession();
+        Sanctum::actingAs($user, ['telemetry:write']);
+
+        $occurredAt = now()->subMinutes(10);
+        $session->update(['ended_at' => now()->subMinutes(5), 'end_reason' => 'sign_out']);
+
+        // A client that lost connectivity delivers this once it is back. The
+        // browsing happened while the session was open, so losing it would put
+        // a hole in the learner's record.
+        $this->postJson(route('api.v1.web-events.store'), $this->payload($session, $category, [
+            'occurred_at' => $occurredAt->toIso8601String(),
+        ]))->assertOk()->assertJsonPath('data.action', 'block');
+
+        $this->assertDatabaseHas('web_events', [
+            'learner_session_id' => $session->id,
+            'learner_id' => $session->learner_id,
+        ]);
+
+        // The session's last activity is not rewound by the late arrival.
+        $this->assertTrue($session->fresh()->last_activity_at->greaterThan($occurredAt));
+    }
+
+    public function test_an_event_that_happened_after_a_session_closed_is_refused(): void
+    {
+        Notification::fake();
+        [$user, $session, $category] = $this->attributedSession();
+        Sanctum::actingAs($user, ['telemetry:write']);
+
+        $session->update(['ended_at' => now()->subMinutes(10), 'end_reason' => 'sign_out']);
+
+        $this->postJson(route('api.v1.web-events.store'), $this->payload($session, $category, [
+            'occurred_at' => now()->toIso8601String(),
+        ]))->assertUnprocessable()->assertJsonValidationErrors('learner_session_id');
+    }
+
+    public function test_a_retried_event_is_recorded_once(): void
+    {
+        Notification::fake();
+        [$user, $session, $category] = $this->attributedSession();
+        Sanctum::actingAs($user, ['telemetry:write']);
+
+        // The client reuses the UUID across retries, which is what makes a retry
+        // after an ambiguous failure safe.
+        $payload = $this->payload($session, $category);
+
+        $first = $this->postJson(route('api.v1.web-events.store'), $payload)->assertOk();
+        $second = $this->postJson(route('api.v1.web-events.store'), $payload)->assertOk();
+
+        $this->assertSame($first->json('data.id'), $second->json('data.id'));
+        $this->assertDatabaseCount('web_events', 1);
+    }
+
     /** @return array{User, LearnerSession, ContentCategory} */
     private function attributedSession(): array
     {

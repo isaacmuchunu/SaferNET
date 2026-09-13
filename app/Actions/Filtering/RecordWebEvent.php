@@ -30,9 +30,13 @@ class RecordWebEvent
                 ->lockForUpdate()
                 ->findOrFail($data['learner_session_id']);
 
-            if ($session->ended_at !== null) {
+            // An ended session still accepts activity that happened while it was
+            // open. A client that lost connectivity retries once it is back, and
+            // rejecting those events outright is how a network interruption
+            // turns into a silent gap in a learner's record.
+            if ($session->ended_at !== null && CarbonImmutable::parse($data['occurred_at'])->greaterThan($session->ended_at)) {
                 throw ValidationException::withMessages([
-                    'learner_session_id' => 'Web activity cannot be attached to an ended learner session.',
+                    'learner_session_id' => 'Web activity cannot be attached to a learner session that had already ended when it occurred.',
                 ]);
             }
 
@@ -54,7 +58,11 @@ class RecordWebEvent
                 'device_id' => $session->device_id,
             ]);
 
-            $session->update(['last_activity_at' => $event->occurred_at]);
+            // Only ever moves forward: a late-arriving event from earlier in the
+            // session must not rewind the session's last activity.
+            if ($session->last_activity_at === null || $session->last_activity_at->lt($event->occurred_at)) {
+                $session->update(['last_activity_at' => $event->occurred_at]);
+            }
             $incident = $this->detectIncident($event);
 
             if ($incident !== null) {

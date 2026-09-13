@@ -71,9 +71,10 @@ Route::prefix('v1')->name('api.v1.')->group(function (): void {
         Route::middleware(['abilities:telemetry:write', 'institution.approved', 'throttle:telemetry'])
             ->group(function (): void {
                 Route::get('extension/sync', [ExtensionController::class, 'sync'])->name('extension.sync');
-                Route::get('agent/policy', [ExtensionController::class, 'sync'])->name('agent.policy');
+                Route::get('agent/policy', [ExtensionController::class, 'agentPolicy'])->name('agent.policy');
                 Route::get('agent/resolve-device', [DeviceController::class, 'resolve'])->name('agent.resolve-device');
                 Route::get('extension/commands', [ExtensionController::class, 'commands'])->name('extension.commands');
+                Route::get('extension/session', [ExtensionController::class, 'session'])->name('extension.session');
                 Route::post('extension/heartbeat', [ExtensionController::class, 'heartbeat'])->name('extension.heartbeat');
                 Route::post('extension/exception-requests', [ExtensionController::class, 'storeExceptionRequest'])
                     ->name('extension.exception-requests.store');

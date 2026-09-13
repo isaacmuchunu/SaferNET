@@ -11,6 +11,7 @@ use App\Models\LearnerSession;
 use App\Models\WebEvent;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -41,39 +42,16 @@ class ClassroomLiveController extends Controller
                 $query->whereHas('device', fn ($dq) => $dq->where('laboratory_id', $laboratoryId));
             })
             ->latest('last_activity_at')
-            ->limit(48)
+            ->limit((int) config('classroom.tile_limit'))
             ->get();
 
         $sessionIds = $activeSessions->pluck('id')->all();
-
-        // Get latest web event per active session
-        $latestEvents = [];
-        if (! empty($sessionIds)) {
-            $events = WebEvent::query()
-                ->whereIn('learner_session_id', $sessionIds)
-                ->with('category')
-                ->latest('occurred_at')
-                ->get();
-
-            foreach ($events as $event) {
-                if (! isset($latestEvents[$event->learner_session_id])) {
-                    $latestEvents[$event->learner_session_id] = $event;
-                }
-            }
-        }
-
-        $eventCounts = WebEvent::query()
-            ->whereIn('learner_session_id', $sessionIds)
-            ->select('learner_session_id')
-            ->selectRaw('COUNT(*) AS total_count')
-            ->selectRaw('SUM(CASE WHEN action = ? THEN 1 ELSE 0 END) AS blocked_count', [EnforcementAction::Block->value])
-            ->groupBy('learner_session_id')
-            ->get()
-            ->keyBy('learner_session_id');
+        $latestEvents = $this->latestEventPerSession($sessionIds);
+        $eventCounts = $this->recentEventCounts($sessionIds);
 
         $tiles = $activeSessions->map(function (LearnerSession $session) use ($latestEvents, $eventCounts, $institutionId) {
-            $latestEvent = $latestEvents[$session->id] ?? null;
-            $isLocked = (bool) Cache::get("classroom_lock_{$institutionId}_{$session->device?->laboratory_id}", false);
+            $latestEvent = $latestEvents->get($session->id);
+            $isLocked = self::focusState($institutionId, $session->device?->laboratory_id)['locked'];
 
             $action = $latestEvent?->action instanceof EnforcementAction
                 ? $latestEvent->action->value
@@ -107,10 +85,8 @@ class ClassroomLiveController extends Controller
             ];
         });
 
-        // Current active classroom push/focus broadcast message
-        $activeBroadcast = $laboratoryId
-            ? Cache::get("classroom_broadcast_{$institutionId}_{$laboratoryId}") ?? Cache::get("classroom_broadcast_{$institutionId}")
-            : Cache::get("classroom_broadcast_{$institutionId}");
+        $pending = self::pendingCommands($institutionId, $laboratoryId ?: null);
+        $activeBroadcast = $pending[0] ?? null;
 
         return response()->json([
             'data' => [
@@ -118,8 +94,70 @@ class ClassroomLiveController extends Controller
                 'active_count' => $activeSessions->count(),
                 'tiles' => $tiles,
                 'active_broadcast' => $activeBroadcast,
+                'pending_commands' => $pending,
+                'focus' => self::focusState($institutionId, $laboratoryId ?: null),
             ],
         ]);
+    }
+
+    /**
+     * The newest event of each active session, as one row per session.
+     *
+     * Read volume here must track the number of tiles on screen, not how long
+     * the lesson has been running: this page polls every few seconds, and
+     * pulling a session's whole history to keep its last row does not stay
+     * affordable through a double period.
+     *
+     * @param  list<int>  $sessionIds
+     * @return Collection<int, WebEvent>
+     */
+    private function latestEventPerSession(array $sessionIds): Collection
+    {
+        if ($sessionIds === []) {
+            return collect();
+        }
+
+        return WebEvent::query()
+            ->with('category')
+            ->whereIn('id', function ($query) use ($sessionIds): void {
+                // DISTINCT ON is PostgreSQL's index-ordered "first row per
+                // group", which this project already requires.
+                $query->selectRaw('DISTINCT ON (learner_session_id) id')
+                    ->from('web_events')
+                    ->whereIn('learner_session_id', $sessionIds)
+                    ->orderByRaw('learner_session_id, occurred_at DESC, id DESC');
+            })
+            ->get()
+            ->keyBy('learner_session_id');
+    }
+
+    /**
+     * Activity counts over a bounded recent window.
+     *
+     * A focus score for a live monitor describes the lesson happening now. An
+     * all-time count both drifts — one bad morning suppressing the score all
+     * term — and grows without limit, so it is scoped to a window.
+     *
+     * @param  list<int>  $sessionIds
+     * @return Collection<int, object>
+     */
+    private function recentEventCounts(array $sessionIds): Collection
+    {
+        if ($sessionIds === []) {
+            return collect();
+        }
+
+        $since = now()->subMinutes((int) config('classroom.focus_window_minutes'));
+
+        return WebEvent::query()
+            ->whereIn('learner_session_id', $sessionIds)
+            ->where('occurred_at', '>=', $since)
+            ->select('learner_session_id')
+            ->selectRaw('COUNT(*) AS total_count')
+            ->selectRaw('SUM(CASE WHEN action = ? THEN 1 ELSE 0 END) AS blocked_count', [EnforcementAction::Block->value])
+            ->groupBy('learner_session_id')
+            ->get()
+            ->keyBy('learner_session_id');
     }
 
     public function pushUrl(Request $request): JsonResponse
@@ -135,14 +173,13 @@ class ClassroomLiveController extends Controller
 
         $institutionId = $user->institution_id;
         $this->ensureLaboratoryBelongsToInstitution($validated['laboratory_id'] ?? null, $institutionId);
-        $labKey = $validated['laboratory_id'] ?? '';
-        $cacheKey = "classroom_broadcast_{$institutionId}".($labKey ? "_{$labKey}" : '');
+        $cacheKey = self::commandKey('push', $institutionId, $validated['laboratory_id'] ?? null);
 
         $payload = [
             'command_id' => (string) Str::uuid(),
             'type' => 'CLASSROOM_PUSH_URL',
             'url' => $validated['url'],
-            'title' => $validated['title'] ?: 'Teacher Lesson Material',
+            'title' => ($validated['title'] ?? null) ?: 'Teacher Lesson Material',
             'pushed_by' => $user->name,
             'pushed_at' => now()->toIso8601String(),
         ];
@@ -184,13 +221,14 @@ class ClassroomLiveController extends Controller
 
         $institutionId = $user->institution_id;
         $this->ensureLaboratoryBelongsToInstitution($validated['laboratory_id'] ?? null, $institutionId);
-        $labKey = $validated['laboratory_id'] ?? '';
-        $cacheKey = "classroom_broadcast_{$institutionId}".($labKey ? "_{$labKey}" : '');
+        // A nudge has its own slot: replacing a lesson URL a learner has not yet
+        // polled for would silently drop the teacher's actual instruction.
+        $cacheKey = self::commandKey('nudge', $institutionId, $validated['laboratory_id'] ?? null);
 
         $payload = [
             'command_id' => (string) Str::uuid(),
             'type' => 'CLASSROOM_ATTENTION_NUDGE',
-            'title' => $validated['message'] ?: 'Teacher Notice: Please focus on the classroom lesson.',
+            'title' => ($validated['message'] ?? null) ?: 'Teacher Notice: Please focus on the classroom lesson.',
             'pushed_by' => $user->name,
             'pushed_at' => now()->toIso8601String(),
         ];
@@ -215,6 +253,15 @@ class ClassroomLiveController extends Controller
         ]);
     }
 
+    /**
+     * Set or release focus mode for a laboratory.
+     *
+     * Focus is explicit state, not an inference from whatever command happens
+     * to be cached. A lock carries the origin it confines learners to, its own
+     * revision and an expiry, so locking without a target is refused here
+     * rather than producing a classroom that reads as locked while restricting
+     * nothing.
+     */
     public function focusMode(Request $request): JsonResponse
     {
         $user = $request->user();
@@ -223,13 +270,20 @@ class ClassroomLiveController extends Controller
         $validated = $request->validate([
             'laboratory_id' => ['required', 'integer'],
             'locked' => ['required', 'boolean'],
+            'url' => ['nullable', 'required_if_accepted:locked', 'url:http,https'],
+            'minutes' => ['nullable', 'integer', 'min:1', 'max:480'],
         ]);
 
         $institutionId = $user->institution_id;
         $this->ensureLaboratoryBelongsToInstitution($validated['laboratory_id'], $institutionId);
-        $cacheKey = "classroom_lock_{$institutionId}_{$validated['laboratory_id']}";
 
-        Cache::put($cacheKey, $validated['locked'], now()->addHours(3));
+        $state = $this->putFocusState(
+            $institutionId,
+            $validated['laboratory_id'],
+            $validated['locked'],
+            $validated['url'] ?? null,
+            $validated['minutes'] ?? null,
+        );
 
         AuditLog::create([
             'actor_id' => $user->id,
@@ -238,15 +292,123 @@ class ClassroomLiveController extends Controller
             'auditable_type' => Laboratory::class,
             'auditable_id' => $validated['laboratory_id'],
             'old_values' => null,
-            'new_values' => ['locked' => $validated['locked']],
+            'new_values' => $state,
             'ip_address' => $request->ip(),
             'user_agent' => $request->userAgent(),
         ]);
 
         return response()->json([
             'message' => $validated['locked'] ? 'Focus Mode activated. Student screens restricted.' : 'Focus Mode deactivated.',
-            'locked' => $validated['locked'],
+            'locked' => $state['locked'],
+            'focus' => $state,
         ]);
+    }
+
+    /**
+     * Writes focus state to its own key, so it survives a nudge or a later URL
+     * push landing in the single command slot.
+     *
+     * @return array{locked: bool, url: ?string, revision: int, expires_at: ?string}
+     */
+    private function putFocusState(int $institutionId, int $laboratoryId, bool $locked, ?string $url, ?int $minutes): array
+    {
+        $key = self::focusKey($institutionId, $laboratoryId);
+        $previous = Cache::get($key);
+        $expiresAt = $locked ? now()->addMinutes($minutes ?? 180) : null;
+
+        $state = [
+            'locked' => $locked,
+            'url' => $locked ? $url : null,
+            // Monotonic, so a client can tell a re-lock from the lock it already has.
+            'revision' => (int) ($previous['revision'] ?? 0) + 1,
+            'expires_at' => $expiresAt?->toIso8601String(),
+        ];
+
+        if ($locked) {
+            Cache::put($key, $state, $expiresAt);
+        } else {
+            // The released state is kept briefly so a polling client learns that
+            // the lock ended, rather than inferring it from a cache miss.
+            Cache::put($key, $state, now()->addMinutes(15));
+        }
+
+        return $state;
+    }
+
+    /**
+     * The focus state a client should currently obey. An expired lock is not a
+     * lock, and is reported as released rather than as nothing.
+     *
+     * @return array{locked: bool, url: ?string, revision: int, expires_at: ?string}
+     */
+    public static function focusState(int $institutionId, ?int $laboratoryId): array
+    {
+        $released = ['locked' => false, 'url' => null, 'revision' => 0, 'expires_at' => null];
+
+        if ($laboratoryId === null) {
+            return $released;
+        }
+
+        $state = Cache::get(self::focusKey($institutionId, $laboratoryId));
+
+        if (! is_array($state) || ! ($state['locked'] ?? false)) {
+            return [...$released, 'revision' => (int) ($state['revision'] ?? 0)];
+        }
+
+        // A lock with no target restricts nothing, so it is not honoured as one.
+        if (($state['url'] ?? null) === null) {
+            return [...$released, 'revision' => (int) $state['revision']];
+        }
+
+        if ($state['expires_at'] !== null && now()->greaterThan($state['expires_at'])) {
+            return [...$released, 'revision' => (int) $state['revision']];
+        }
+
+        return $state;
+    }
+
+    private static function focusKey(int $institutionId, int $laboratoryId): string
+    {
+        return "classroom_focus_{$institutionId}_{$laboratoryId}";
+    }
+
+    /**
+     * Each command kind gets its own slot, per school and per laboratory. One
+     * shared slot meant the newest command evicted whatever a client had not
+     * polled for yet.
+     */
+    private static function commandKey(string $kind, int $institutionId, ?int $laboratoryId): string
+    {
+        return "classroom_{$kind}_{$institutionId}".($laboratoryId ? "_{$laboratoryId}" : '');
+    }
+
+    /**
+     * Every command still waiting to be collected, newest first. A laboratory
+     * sees its own commands as well as those addressed to the whole school.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public static function pendingCommands(int $institutionId, ?int $laboratoryId): array
+    {
+        $commands = [];
+
+        foreach (['push', 'nudge'] as $kind) {
+            // A laboratory's own command outranks the school-wide one of the
+            // same kind, so the broader slot is only read when it has none.
+            foreach ([$laboratoryId, null] as $scope) {
+                $command = Cache::get(self::commandKey($kind, $institutionId, $scope));
+
+                if (is_array($command)) {
+                    $commands[] = $command;
+
+                    break;
+                }
+            }
+        }
+
+        usort($commands, fn (array $a, array $b): int => strcmp($b['pushed_at'] ?? '', $a['pushed_at'] ?? ''));
+
+        return $commands;
     }
 
     private function ensureLaboratoryBelongsToInstitution(?int $laboratoryId, ?int $institutionId): void

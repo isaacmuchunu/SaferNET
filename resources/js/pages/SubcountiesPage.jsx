@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MapPinIcon, PlusIcon } from 'lucide-react';
 import { PageHeader } from '../components/PageHeader';
-import { Button, EmptyState, ErrorState, Field, Panel, Skeleton, TextInput, firstError } from '../components/Primitives';
+import { Button, EmptyState, ErrorState, Field, Meter, Panel, Skeleton, TextInput, coverageTone, firstError } from '../components/Primitives';
 import { Drawer } from '../components/Overlays';
 import { StatusPill } from '../components/StatusPill';
 import { useAuth } from '../lib/auth';
@@ -91,12 +91,12 @@ export function SubcountiesPage() {
                                     {formatNumber(item.learners_count)} learners
                                 </p>
 
-                                <div className="mt-4 h-1.5 rounded-full bg-surface-muted">
-                                    <div
-                                        className={`h-full rounded-full ${coverage >= 80 ? 'bg-success' : coverage >= 50 ? 'bg-warning' : 'bg-info'}`}
-                                        style={{ width: `${coverage}%` }}
-                                    />
-                                </div>
+                                <Meter
+                                    value={coverage}
+                                    tone={coverageTone(coverage)}
+                                    label={`${item.name} protection coverage`}
+                                    className="mt-4"
+                                />
                                 <div className="mt-2 flex justify-between text-[11px] text-text-secondary tabular-nums">
                                     <span>{item.protected_institutions_count} protected</span>
                                     <span>{attribution === null ? 'No devices' : `${formatPercent(attribution, 0)} attributed`}</span>

@@ -1,0 +1,118 @@
+# Three deliverables ship from this repository — the Laravel application, the
+# browser extension and the Windows agent — and a release is only as trustworthy
+# as the weakest of them. Each job below must be able to fail the build on its
+# own; none of them may be skipped to get a green run.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  application:
+    name: Laravel application
+    runs-on: ubuntu-latest
+
+    # The suite runs against PostgreSQL because the application requires it:
+    # DISTINCT ON, the composite tenant foreign keys and the policy check
+    # constraints do not exist on SQLite, so testing on SQLite would prove
+    # nothing about production.
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: safernet_testing
+          POSTGRES_USER: safernet_app
+          POSTGRES_PASSWORD: safernet_ci_only
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd="pg_isready -U safernet_app"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+
+    env:
+      DB_CONNECTION: pgsql
+      DB_HOST: 127.0.0.1
+      DB_PORT: 5432
+      DB_DATABASE: safernet_testing
+      DB_USERNAME: safernet_app
+      DB_PASSWORD: safernet_ci_only
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          # gd is needed by the avatar and PDF report tests; without it they
+          # fail for reasons that have nothing to do with the change under test.
+          extensions: pdo_pgsql, gd, mbstring, intl, zip
+          coverage: none
+
+      - name: Install PHP dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Prepare the environment
+        run: |
+          cp .env.example .env || true
+          php artisan key:generate --no-interaction
+
+      - name: Check formatting
+        run: vendor/bin/pint --test
+
+      - name: Migrate
+        run: php artisan migrate --no-interaction --force
+
+      - name: Run the test suite
+        run: php artisan test
+
+  frontend:
+    name: Officer portal and extension
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      # Parses every extension script and confirms the manifest does not point
+      # at a file that was renamed or removed, then builds the portal.
+      - run: npm run check
+
+  agent:
+    name: Windows agent
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Run the agent test suite
+        run: dotnet test agent/windows/tests/SaferNet.Agent.Tests --configuration Release --nologo
+
+      # Proves packaging is unreachable from a failed test or publish, and that
+      # the installer scripts parse before they are ever shipped to a school.
+      - name: Build the installable package
+        shell: pwsh
+        run: ./agent/windows/build.ps1 -Runtime win-x64
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: safernet-agent-win-x64
+          path: agent/windows/dist/SaferNET-Agent-win-x64.zip
+          if-no-files-found: error

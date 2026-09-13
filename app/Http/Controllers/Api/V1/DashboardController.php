@@ -40,8 +40,9 @@ class DashboardController extends Controller
             'attributed_devices' => $deviceTotal - $unattributed,
             'institutions_by_status' => $this->tally($institutions, 'status'),
             'devices_by_status' => $this->tally($devices, 'status'),
-            'components_by_health' => $this->tally($components, 'health_status'),
+            'components_by_health' => $this->componentHealth($components),
             'components_by_type' => $this->componentMatrix($components),
+            'components_total' => (clone $components)->count(),
             'open_incidents_by_severity' => $this->tally(
                 (clone $incidents)->whereIn('status', ['open', 'under_review']),
                 'severity',
@@ -71,21 +72,40 @@ class DashboardController extends Controller
     }
 
     /**
+     * Component health, counted from what is currently true rather than from
+     * the column. A component that has stopped checking in reports nothing, so
+     * its last claim of health is not evidence it is still enforcing.
+     *
+     * @return array<string, int>
+     */
+    private function componentHealth(Builder $components): array
+    {
+        return (clone $components)->reorder()
+            ->getQuery()
+            ->select(ProtectionComponent::healthExpression('derived_health'))
+            ->selectRaw('count(*) as aggregate')
+            ->groupBy('derived_health')
+            ->pluck('aggregate', 'derived_health')
+            ->map(fn ($count): int => (int) $count)
+            ->all();
+    }
+
+    /**
      * Protection component health broken down by component type, for the
-     * deployment cards.
+     * deployment cards, on the same derived basis.
      *
      * @return array<string, array<string, int>>
      */
     private function componentMatrix(Builder $components): array
     {
-        return $components->reorder()
+        return (clone $components)->reorder()
             ->getQuery()
-            ->select('type', 'health_status')
+            ->select('type', ProtectionComponent::healthExpression('derived_health'))
             ->selectRaw('count(*) as aggregate')
-            ->groupBy('type', 'health_status')
+            ->groupBy('type', 'derived_health')
             ->get()
             ->groupBy('type')
-            ->map(fn ($rows) => $rows->pluck('aggregate', 'health_status')->map(fn ($count): int => (int) $count)->all())
+            ->map(fn ($rows) => $rows->pluck('aggregate', 'derived_health')->map(fn ($count): int => (int) $count)->all())
             ->all();
     }
 

@@ -14,3 +14,11 @@ Schedule::command('safernet:sync-blocklists')
     ->weeklyOn(0, '02:30')
     ->withoutOverlapping()
     ->onOneServer();
+
+// A device that stops checking in must stop counting as protected. The console
+// derives this when it reads, so this only settles the stored column for
+// reports and exports that query it directly.
+Schedule::command('safernet:expire-stale-components')
+    ->everyFifteenMinutes()
+    ->withoutOverlapping()
+    ->onOneServer();

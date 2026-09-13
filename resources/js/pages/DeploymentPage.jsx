@@ -36,6 +36,15 @@ export function DeploymentPage() {
     const attention = (health.degraded ?? 0) + (health.offline ?? 0);
     const total = Object.values(health).reduce((sum, value) => sum + Number(value ?? 0), 0);
     const healthRate = total > 0 ? Math.round((healthy / total) * 100) : 0;
+    // Nothing reporting is an unknown posture, not a clean one. Saying
+    // "All healthy" over an empty inventory is how an unprotected school reads
+    // as a protected one.
+    const posture = total === 0
+        ? { tone: 'bg-slate-200 text-slate-700', icon: ShieldAlertIcon, label: 'No components enrolled' }
+        : attention > 0
+          ? { tone: 'bg-warning-soft text-warning-strong', icon: TriangleAlertIcon, label: `${attention} need attention` }
+          : { tone: 'bg-success-soft text-success', icon: CheckCircle2Icon, label: 'All healthy' };
+    const PostureIcon = posture.icon;
     const urgentEvents = events.filter((event) => ['critical', 'high'].includes(event.severity)).length;
 
     return (
@@ -54,9 +63,9 @@ export function DeploymentPage() {
                             <p className="text-[10px] font-bold tracking-[0.16em] text-white/60 uppercase">Network posture</p>
                             <h2 className="mt-1.5 text-lg font-bold">Deployment health</h2>
                         </div>
-                        <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold ${attention ? 'bg-warning-soft text-warning-strong' : 'bg-success-soft text-success'}`}>
-                            {attention ? <TriangleAlertIcon size={12} /> : <CheckCircle2Icon size={12} />}
-                            {attention ? `${attention} need attention` : 'All healthy'}
+                        <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold ${posture.tone}`}>
+                            <PostureIcon size={12} />
+                            {posture.label}
                         </span>
                     </div>
 
@@ -66,12 +75,25 @@ export function DeploymentPage() {
                         <>
                             <div className="mt-8 flex items-end justify-between gap-5">
                                 <div>
-                                    <p className="text-[54px] leading-none font-bold tracking-[-.05em]">{healthRate}%</p>
-                                    <p className="mt-2 text-xs text-white/65">components reporting healthy</p>
+                                    <p className="text-[54px] leading-none font-bold tracking-[-.05em]">{total === 0 ? '—' : `${healthRate}%`}</p>
+                                    <p className="mt-2 text-xs text-white/65">
+                                        {total === 0
+                                            ? 'no components have checked in yet'
+                                            : 'checking in and enforcing a current policy'}
+                                    </p>
                                 </div>
                                 <ActivityIcon size={46} strokeWidth={1.4} className="text-white/35" />
                             </div>
-                            <div className="mt-6 h-2 overflow-hidden rounded-full bg-white/15">
+                            {/* Meter: the unfilled track is a lighter step of the
+                                fill's own ramp, so state reads across the whole bar. */}
+                            <div
+                                className="mt-6 h-2 overflow-hidden rounded-full bg-white/15"
+                                role="progressbar"
+                                aria-valuenow={healthRate}
+                                aria-valuemin={0}
+                                aria-valuemax={100}
+                                aria-label="Share of components reporting healthy"
+                            >
                                 <div className="h-full rounded-full bg-[#65c5b7]" style={{ width: `${healthRate}%` }} />
                             </div>
                             <div className="mt-5 grid grid-cols-3 gap-3 border-t border-white/10 pt-4">
@@ -100,13 +122,13 @@ export function DeploymentPage() {
                 <Panel className="min-w-0 overflow-hidden">
                     <PanelHeader
                         title="Component inventory"
-                        description="Version, last check-in and policy-sync state for every enrolled protection component."
+                        description="Last contact and last successful policy installation are shown separately: reaching the server is not evidence that a policy was installed."
                     />
                     <DataTable
                         query={components}
                         rows={rows}
                         minWidth="820px"
-                        columns={['Component', 'Identifier', 'Version', 'Last seen', 'Policy synced', 'Health']}
+                        columns={['Component', 'Identifier', 'Version', 'Last contact', 'Policy installed', 'Health']}
                         empty={
                             <EmptyState
                                 icon={ChromeIcon}
@@ -121,8 +143,17 @@ export function DeploymentPage() {
                                 <Cell mono muted>{component.identifier}</Cell>
                                 <Cell muted>{component.version ?? '—'}</Cell>
                                 <Cell muted>{formatRelative(component.last_seen_at)}</Cell>
-                                <Cell muted>{formatRelative(component.policy_synced_at)}</Cell>
-                                <Cell><StatusPill descriptor={HEALTH_STATUS[component.health_status]} /></Cell>
+                                <Cell muted>
+                                    {component.policy_synced_at
+                                        ? formatRelative(component.policy_synced_at)
+                                        : <span className="text-warning-strong">never</span>}
+                                </Cell>
+                                <Cell>
+                                    {/* The derived status, which outranks a stale claim of health. */}
+                                    <StatusPill
+                                        descriptor={HEALTH_STATUS[component.effective_health_status ?? component.health_status]}
+                                    />
+                                </Cell>
                             </Row>
                         ))}
                     </DataTable>
@@ -186,10 +217,16 @@ function ComponentTypeCard({ type, label, counts, loading }) {
                 {loading ? <Skeleton className="h-7 w-10" /> : <strong className="text-2xl tracking-[-.03em] tabular-nums">{total}</strong>}
             </div>
 
-            <div className="mt-5 flex h-2 overflow-hidden rounded-full bg-surface-muted">
-                {healthyShare > 0 && <span className="bg-success" style={{ width: `${healthyShare}%` }} />}
-                {degradedShare > 0 && <span className="bg-warning" style={{ width: `${degradedShare}%` }} />}
-                {offlineShare > 0 && <span className="bg-danger" style={{ width: `${offlineShare}%` }} />}
+            {/* Status colours, separated by a 2px surface gap; the counts below
+                are the written channel, so nothing rests on hue. */}
+            <div
+                className="mt-5 flex h-2 gap-[2px] overflow-hidden rounded-full bg-surface-muted"
+                role="img"
+                aria-label={`${counts.healthy} healthy, ${counts.degraded} degraded, ${counts.offline} offline`}
+            >
+                {healthyShare > 0 && <span className="bg-success first:rounded-l-full last:rounded-r-full" style={{ width: `${healthyShare}%` }} />}
+                {degradedShare > 0 && <span className="bg-warning first:rounded-l-full last:rounded-r-full" style={{ width: `${degradedShare}%` }} />}
+                {offlineShare > 0 && <span className="bg-danger first:rounded-l-full last:rounded-r-full" style={{ width: `${offlineShare}%` }} />}
             </div>
             <div className="mt-3 grid grid-cols-3 gap-2 text-center">
                 <MiniFact label="Healthy" value={counts.healthy} className="text-success" />

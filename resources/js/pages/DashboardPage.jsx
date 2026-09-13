@@ -9,7 +9,7 @@ import {
     ShieldCheckIcon,
     UsersRoundIcon,
 } from 'lucide-react';
-import { Cell, DataTable, EmptyState, ErrorState, Panel, PanelHeader, Row } from '../components/Primitives';
+import { Cell, DataTable, EmptyState, ErrorState, Meter, Panel, PanelHeader, Row, coverageTone } from '../components/Primitives';
 import { StatusPill } from '../components/StatusPill';
 import { PostureBand } from '../components/dashboard/PostureBand';
 import { AttentionQueue } from '../components/dashboard/AttentionQueue';
@@ -344,12 +344,12 @@ function SubcountyProtectionPanel({ rows, query, onOpen }) {
                             <Cell muted>{item.institutions_count}</Cell>
                             <Cell>
                                 <div className="flex items-center gap-2.5">
-                                    <div className="h-1.5 w-24 shrink-0 overflow-hidden rounded-full bg-surface-muted">
-                                        <div
-                                            className={`h-full rounded-full ${coverage >= 80 ? 'bg-success' : coverage >= 50 ? 'bg-warning' : 'bg-danger'}`}
-                                            style={{ width: `${Math.min(coverage, 100)}%` }}
-                                        />
-                                    </div>
+                                    <Meter
+                                        value={coverage}
+                                        tone={coverageTone(coverage)}
+                                        label={`${item.name} protection coverage`}
+                                        className="w-24 shrink-0"
+                                    />
                                     <span className="min-w-[72px] text-xs font-medium text-text-secondary tabular-nums">
                                         {item.protected_institutions_count}/{item.institutions_count}
                                     </span>

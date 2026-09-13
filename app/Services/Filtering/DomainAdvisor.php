@@ -5,8 +5,6 @@ namespace App\Services\Filtering;
 use App\Enums\EnforcementAction;
 use App\Enums\Severity;
 use App\Models\BlockedDomain;
-use App\Models\ContentCategory;
-use App\Models\PolicyRule;
 use App\Services\Ai\ContentClassifier;
 
 /**
@@ -14,17 +12,26 @@ use App\Services\Ai\ContentClassifier;
  *
  * Order matters and is deliberate:
  *
- *   1. the county blocklists, which are deterministic, auditable and the same
+ *   1. the school's allowlist — the curriculum baseline and approved,
+ *      unexpired exceptions, which is what an approval in the portal means;
+ *   2. the county blocklists, which are deterministic, auditable and the same
  *      for every school;
- *   2. the school's own filtering policy for the category that match belongs to;
- *   3. only where both are silent, the classifier — and only as advice.
+ *   3. the school's own filtering policy for the category that match belongs to;
+ *   4. only where all are silent, the classifier — and only as advice.
  *
  * A model never softens a county-mandated block: a blocklist match is answered
  * from policy, and the classifier is consulted for unknown domains alone.
+ *
+ * Category actions and exceptions are resolved by {@see EffectivePolicyResolver},
+ * the same service that compiles the agent and extension policies, so an
+ * assessment here and a device in a laboratory cannot reach different answers.
  */
 class DomainAdvisor
 {
-    public function __construct(private readonly ContentClassifier $classifier) {}
+    public function __construct(
+        private readonly ContentClassifier $classifier,
+        private readonly EffectivePolicyResolver $resolver,
+    ) {}
 
     /**
      * @return array{
@@ -40,15 +47,30 @@ class DomainAdvisor
      *     model: ?string
      * }
      */
-    public function assess(string $url, ?int $institutionId = null, string $query = ''): array
+    public function assess(string $url, ?int $institutionId = null, string $query = '', ?int $learnerGroupId = null): array
     {
         $domain = $this->domainOf($url);
 
         if ($domain !== null) {
+            if ($this->resolver->isAllowed($domain, $institutionId)) {
+                return [
+                    'domain' => $domain,
+                    'source' => 'allowlist',
+                    'action' => EnforcementAction::Allow->value,
+                    'severity' => Severity::Low->value,
+                    'category' => null,
+                    'content_category_id' => null,
+                    'policy_rule_id' => null,
+                    'rationale' => 'On the curriculum allowlist or covered by an approved, unexpired exception.',
+                    'provider' => null,
+                    'model' => null,
+                ];
+            }
+
             $match = $this->blocklistMatch($domain);
 
             if ($match !== null) {
-                return $this->fromBlocklist($domain, $match, $institutionId);
+                return $this->fromBlocklist($domain, $match, $institutionId, $learnerGroupId);
             }
         }
 
@@ -86,16 +108,9 @@ class DomainAdvisor
     /** Registrable-domain walk: a block on example.com covers ads.example.com. */
     public function blocklistMatch(string $domain): ?BlockedDomain
     {
-        $labels = explode('.', $domain);
-        $candidates = [];
-
-        for ($index = 0; $index < count($labels) - 1; $index++) {
-            $candidates[] = implode('.', array_slice($labels, $index));
-        }
-
         return BlockedDomain::query()
             ->with('source.category')
-            ->whereIn('domain', $candidates)
+            ->whereIn('domain', $this->resolver->domainAndParents($domain))
             ->join('blocklist_sources', 'blocklist_sources.id', '=', 'blocked_domains.blocklist_source_id')
             ->where('blocklist_sources.is_enabled', true)
             ->select('blocked_domains.*')
@@ -116,44 +131,22 @@ class DomainAdvisor
     /**
      * @return array<string, mixed>
      */
-    private function fromBlocklist(string $domain, BlockedDomain $match, ?int $institutionId): array
+    private function fromBlocklist(string $domain, BlockedDomain $match, ?int $institutionId, ?int $learnerGroupId): array
     {
         $category = $match->source->category;
-        $rule = $category === null ? null : $this->ruleFor($category, $institutionId);
-
-        $action = $rule?->action ?? EnforcementAction::Block;
-        $severity = $rule?->severity ?? ($category?->default_severity ?? Severity::High);
+        $decision = $this->resolver->decisionForCategory($category, $institutionId, $learnerGroupId);
 
         return [
             'domain' => $domain,
             'source' => 'blocklist',
-            'action' => $action instanceof EnforcementAction ? $action->value : (string) $action,
-            'severity' => $severity instanceof Severity ? $severity->value : (string) $severity,
+            'action' => $decision['action']->value,
+            'severity' => ($decision['severity'] ?? Severity::High)->value,
             'category' => $category?->name,
             'content_category_id' => $category?->id,
-            'policy_rule_id' => $rule?->id,
+            'policy_rule_id' => $decision['policy_rule_id'],
             'rationale' => sprintf('Listed by %s as %s.', $match->source->name, $category?->name ?? 'a blocked category'),
             'provider' => null,
             'model' => null,
         ];
-    }
-
-    /**
-     * The narrowest active rule that governs this category: the school's own
-     * policy when it has one, otherwise the county baseline.
-     */
-    private function ruleFor(ContentCategory $category, ?int $institutionId): ?PolicyRule
-    {
-        return PolicyRule::query()
-            ->where('content_category_id', $category->id)
-            ->whereHas('policy', fn ($policies) => $policies
-                ->where('status', 'active')
-                ->where(fn ($scoped) => $scoped
-                    ->whereNull('institution_id')
-                    ->when($institutionId, fn ($query, $id) => $query->orWhere('institution_id', $id))))
-            ->with('policy')
-            ->get()
-            ->sortByDesc(fn (PolicyRule $rule) => $rule->policy->institution_id === null ? 0 : 1)
-            ->first();
     }
 }

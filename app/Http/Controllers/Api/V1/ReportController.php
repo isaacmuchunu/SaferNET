@@ -20,7 +20,14 @@ class ReportController extends Controller
         return response()->json(['data' => [
             'learners' => Learner::query()->visibleTo($user)->count(),
             'devices' => Device::query()->visibleTo($user)->count(),
-            'protected_components' => ProtectionComponent::query()->visibleTo($user)->where('health_status', 'healthy')->count(),
+            // Healthy and still checking in: a component that has gone quiet is
+            // not evidence of protection, whatever it last reported.
+            'protected_components' => ProtectionComponent::query()
+                ->visibleTo($user)
+                ->where('health_status', ProtectionComponent::Healthy)
+                ->whereNotNull('policy_synced_at')
+                ->where('last_seen_at', '>=', now()->subMinutes((int) config('deployment.stale_after_minutes')))
+                ->count(),
             'blocked_top_level_requests' => WebEvent::query()->visibleTo($user)->where('action', 'block')->where('request_kind', 'top_level')->count(),
             'open_incidents' => Incident::query()->visibleTo($user)->whereIn('status', ['open', 'under_review'])->count(),
             'generated_at' => now(),

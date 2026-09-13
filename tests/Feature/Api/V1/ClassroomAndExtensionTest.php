@@ -2,11 +2,16 @@
 
 namespace Tests\Feature\Api\V1;
 
+use App\Models\BlockedDomain;
+use App\Models\BlocklistSource;
+use App\Models\ContentCategory;
 use App\Models\Device;
+use App\Models\ExceptionRequest;
 use App\Models\FilteringPolicy;
 use App\Models\Institution;
 use App\Models\Laboratory;
 use App\Models\Learner;
+use App\Models\LearnerGroup;
 use App\Models\ProtectionComponent;
 use App\Models\User;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
@@ -90,6 +95,63 @@ class ClassroomAndExtensionTest extends TestCase
         ]);
         $response->assertJsonPath('institution_id', $institution->id);
         $response->assertJsonPath('nemis_code', 'KIKUYU001');
+    }
+
+    public function test_agent_and_extension_deliveries_declare_their_own_completeness(): void
+    {
+        config(['filtering.browser_rule_limit' => 10]);
+        $institution = Institution::factory()->create();
+        $source = BlocklistSource::create([
+            'slug' => 'test-source',
+            'name' => 'Test Source',
+            'url' => 'https://raw.githubusercontent.com/test/hosts',
+            'content_category_id' => ContentCategory::factory()->create()->id,
+            'provenance' => 'test fixture',
+            'is_enabled' => true,
+        ]);
+
+        foreach (range(1, 20) as $index) {
+            BlockedDomain::create([
+                'blocklist_source_id' => $source->id,
+                'domain' => sprintf('domain-%02d.example', $index),
+            ]);
+        }
+
+        ExceptionRequest::factory()->reviewed()->create([
+            'institution_id' => $institution->id,
+            'domain' => 'domain-01.example',
+        ]);
+
+        $service = User::factory()->service($institution)->create();
+        Sanctum::actingAs($service, ['telemetry:write']);
+
+        $agent = $this->getJson(route('api.v1.agent.policy'))->assertOk();
+        $agent->assertJsonPath('delivery.client', 'endpoint_agent');
+        $agent->assertJsonPath('delivery.complete', true);
+        $agent->assertJsonPath('delivery.total_domains', 19);
+        $this->assertContains('domain-20.example', $agent->json('blocked_domains'));
+        $this->assertNotContains('domain-01.example', $agent->json('blocked_domains'));
+        $this->assertContains('domain-01.example', $agent->json('allowed_domains'));
+
+        $browser = $this->getJson(route('api.v1.extension.sync'))->assertOk();
+        $browser->assertJsonPath('delivery.client', 'browser_extension');
+        $browser->assertJsonPath('delivery.complete', false);
+        $browser->assertJsonPath('delivery.total_domains', 19);
+        $this->assertNotContains('domain-20.example', $browser->json('blocked_domains'));
+        $this->assertSame($agent->json('content_hash'), $browser->json('content_hash'));
+    }
+
+    public function test_a_learner_group_from_another_school_is_refused_by_the_policy_endpoints(): void
+    {
+        $institution = Institution::factory()->create();
+        $foreignGroup = LearnerGroup::factory()->create();
+
+        $service = User::factory()->service($institution)->create();
+        Sanctum::actingAs($service, ['telemetry:write']);
+
+        $this->getJson(route('api.v1.extension.sync', ['learner_group_id' => $foreignGroup->id]))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('learner_group_id');
     }
 
     public function test_extension_endpoints_require_an_institution_service_token(): void

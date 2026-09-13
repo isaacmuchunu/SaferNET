@@ -34,6 +34,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       device_id: deviceInput.value ? Number(deviceInput.value) : null,
       laboratory_id: laboratoryInput.value ? Number(laboratoryInput.value) : null,
       learner_session_id: learnerSessionInput.value ? Number(learnerSessionInput.value) : null,
+      // An entered value pins the session; left blank, the extension resolves
+      // the signed-in learner from the server and follows learner changes.
+      learner_session_pinned: Boolean(learnerSessionInput.value),
       token: tokenInput.value.trim()
     });
 

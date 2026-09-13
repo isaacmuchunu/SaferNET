@@ -13,10 +13,19 @@ public sealed class SaferNetApiClient(HttpClient client, IOptions<AgentOptions> 
     {
         var response = await client.GetFromJsonAsync<PolicyResponse>("agent/policy", cancellationToken)
             ?? throw new InvalidOperationException("The policy endpoint returned an empty response.");
-        return new(response.Revision, response.BlockedDomains.ToImmutableHashSet(StringComparer.OrdinalIgnoreCase), response.SyncedAt);
+        return new(
+            response.Revision,
+            (response.BlockedDomains ?? []).ToImmutableHashSet(StringComparer.OrdinalIgnoreCase),
+            (response.AllowedDomains ?? []).ToImmutableHashSet(StringComparer.OrdinalIgnoreCase),
+            response.SyncedAt);
     }
 
-    public async Task SendHeartbeatAsync(FilterPolicy policy, CancellationToken cancellationToken)
+    /// <summary>
+    /// Reports contact and enforcement separately: <c>policy_synced_at</c> is
+    /// when a policy was last actually installed, not when this heartbeat was
+    /// sent, and the status comes from the resolver rather than being asserted.
+    /// </summary>
+    public async Task SendHeartbeatAsync(FilterPolicy policy, AgentHealth health, CancellationToken cancellationToken)
     {
         using var response = await client.PostAsJsonAsync("protection-components", new
         {
@@ -24,9 +33,18 @@ public sealed class SaferNetApiClient(HttpClient client, IOptions<AgentOptions> 
             type = "endpoint_agent",
             identifier = _options.WorkstationId,
             version = "1.0.0",
-            health_status = "healthy",
-            policy_synced_at = policy.SyncedAt,
-            metadata = new { blocked_domains = policy.BlockedDomains.Count, dns_filter = "udp", machine = Environment.MachineName },
+            health_status = health.Status,
+            policy_synced_at = health.PolicyInstalledAt,
+            metadata = new
+            {
+                blocked_domains = policy.BlockedDomains.Count,
+                allowed_domains = policy.AllowedDomains.Count,
+                applied_revision = health.AppliedRevision,
+                resolver_listening = health.ResolverListening,
+                dns_endpoints = health.Endpoints,
+                last_error = health.LastError,
+                machine = Environment.MachineName,
+            },
         }, cancellationToken);
         response.EnsureSuccessStatusCode();
     }
@@ -48,7 +66,8 @@ public sealed class SaferNetApiClient(HttpClient client, IOptions<AgentOptions> 
     }
 
     private sealed record PolicyResponse(
-        [property: JsonPropertyName("revision")] int Revision,
-        [property: JsonPropertyName("blocked_domains")] string[] BlockedDomains,
+        [property: JsonPropertyName("revision")] long Revision,
+        [property: JsonPropertyName("blocked_domains")] string[]? BlockedDomains,
+        [property: JsonPropertyName("allowed_domains")] string[]? AllowedDomains,
         [property: JsonPropertyName("synced_at")] DateTimeOffset SyncedAt);
 }
