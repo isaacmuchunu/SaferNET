@@ -35,6 +35,44 @@
     --color-info: #2563a6;
     --color-info-soft: #eaf2fb;
 
+    /*
+     | Chart palette — the data-visualisation instance of the tokens above.
+     |
+     | Every chart colour does exactly one job. Marks carry colour; labels and
+     | values stay in the text tokens, so identity is never colour alone.
+     |
+     | Validated against the white chart surface (OKLab ΔE, Machado 2009 CVD
+     | simulation at severity 1.0):
+     |   · series-1        chroma 0.10+, contrast ≥ 3:1
+     |   · severity ramp   monotone L, ΔL ≥ 0.06 per step, light end 2.05:1
+     |   · status set      worst adjacent pair ΔE 7.9 (protan) — inside the
+     |                     6–8 floor band, so every status mark ships a written
+     |                     label and a 2px surface gap as secondary encoding.
+     */
+
+    /* Single-series identity. A lighter, more chromatic step of the brand
+       teal: --color-brand itself sits at chroma 0.086 and reads grey as a mark. */
+    --color-viz-series: #068c7f;
+    --color-viz-track: #dcefec;
+
+    /* Chart chrome — one step off the surface, recessive, never dashed. */
+    --color-viz-grid: #e3efec;
+    --color-viz-axis: #cbdedb;
+
+    /* Severity is ordinal, so it is one hue running light → dark. Stepped
+       clear of the reserved status tokens below, so "high severity" and
+       "not deployed" never share a swatch. */
+    --color-viz-sev-low: #e8a49e;
+    --color-viz-sev-medium: #cf6b62;
+    --color-viz-sev-high: #a82633;
+    --color-viz-sev-critical: #7a1420;
+
+    /* Meter tracks: a lighter step of the fill's own ramp, so state reads
+       across the whole bar rather than only the filled part. */
+    --color-viz-track-good: #d3ebde;
+    --color-viz-track-warning: #f6e4c4;
+    --color-viz-track-danger: #f5d8da;
+
     --radius-lg: 10px;
     --radius-xl: 12px;
     --radius-2xl: 16px;

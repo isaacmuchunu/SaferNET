@@ -338,3 +338,47 @@ export function DetailRow({ label, children }) {
         </div>
     );
 }
+
+/**
+ * A proportion bar.
+ *
+ * The fill carries severity and the unfilled track is a lighter step of that
+ * same ramp, so the state reads across the whole bar rather than only the
+ * filled part. The value is always announced, so the meter never has to be
+ * read by eye alone.
+ */
+const METER_TONES = {
+    brand: { fill: 'bg-viz-series', track: 'bg-viz-track' },
+    good: { fill: 'bg-success', track: 'bg-viz-track-good' },
+    warning: { fill: 'bg-warning', track: 'bg-viz-track-warning' },
+    danger: { fill: 'bg-danger', track: 'bg-viz-track-danger' },
+    muted: { fill: 'bg-text-muted', track: 'bg-surface-muted' },
+};
+
+export function Meter({ value, label, tone = 'brand', className, barClassName }) {
+    const percent = Math.min(100, Math.max(0, Number(value) || 0));
+    const { fill, track } = METER_TONES[tone] ?? METER_TONES.brand;
+
+    return (
+        <div
+            role="progressbar"
+            aria-valuenow={Math.round(percent)}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-label={label}
+            className={clsx('h-1.5 overflow-hidden rounded-full', track, className)}
+        >
+            <div
+                className={clsx('h-full rounded-full transition-[width] duration-500 ease-gov motion-reduce:transition-none', fill, barClassName)}
+                style={{ width: `${percent}%` }}
+            />
+        </div>
+    );
+}
+
+/** Picks the meter tone from a coverage percentage, high is good. */
+export function coverageTone(percent) {
+    if (percent >= 80) return 'good';
+    if (percent >= 50) return 'warning';
+    return 'danger';
+}

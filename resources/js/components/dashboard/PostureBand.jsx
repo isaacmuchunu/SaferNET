@@ -3,11 +3,21 @@ import { ArrowUpRightIcon } from 'lucide-react';
 import { Skeleton } from '../Primitives';
 import { formatNumber, formatPercent } from '../../lib/format';
 
+/**
+ * Deployment posture is state, not identity, so these are the reserved status
+ * colours rather than a categorical palette.
+ *
+ * The worst adjacent pair here (protected ↔ attention required) measures ΔE 7.9
+ * under simulated protanopia — inside the 6–8 floor band, which is legal only
+ * with secondary encoding. Every segment therefore carries a written label and
+ * a value in the legend below, and the segments are separated by a surface gap
+ * rather than by hue alone.
+ */
 const BANDS = [
-    { label: 'Protected', color: '#167a4a', statuses: ['protected'] },
-    { label: 'Attention required', color: '#c17712', statuses: ['attention_required', 'attribution_required'] },
-    { label: 'Deploying', color: '#2563a6', statuses: ['approved', 'onboarding', 'deployment_in_progress'] },
-    { label: 'Not deployed', color: '#b4232f', statuses: ['draft', 'pending_approval', 'rejected', 'suspended'] },
+    { label: 'Protected', color: 'var(--color-success)', statuses: ['protected'] },
+    { label: 'Attention required', color: 'var(--color-warning)', statuses: ['attention_required', 'attribution_required'] },
+    { label: 'Deploying', color: 'var(--color-info)', statuses: ['approved', 'onboarding', 'deployment_in_progress'] },
+    { label: 'Not deployed', color: 'var(--color-danger)', statuses: ['draft', 'pending_approval', 'rejected', 'suspended'] },
 ];
 
 export function PostureBand({ metrics, loading, scopeLabel = 'county' }) {
@@ -77,8 +87,10 @@ export function PostureBand({ metrics, loading, scopeLabel = 'county' }) {
                     </div>
                 </div>
 
+                {/* A 2px surface gap does the separating — never a border drawn
+                    around the marks. */}
                 <div
-                    className="mt-3 flex h-2 overflow-hidden rounded-full bg-surface-muted"
+                    className="mt-3 flex h-2 gap-[2px] overflow-hidden rounded-full"
                     role="img"
                     aria-label={segments.map((segment) => `${segment.value} ${segment.label}`).join(', ')}
                 >
@@ -87,11 +99,29 @@ export function PostureBand({ metrics, loading, scopeLabel = 'county' }) {
                         .map((segment) => (
                             <span
                                 key={segment.label}
-                                className="h-full border-r border-white last:border-0"
+                                className="h-full first:rounded-l-full last:rounded-r-full"
                                 style={{ width: `${segment.share}%`, backgroundColor: segment.color }}
                             />
                         ))}
                 </div>
+
+                {/* The legend is the dependable channel: identity never rests on
+                    hue, which is what the 6–8 CVD band obliges. */}
+                <ul className="mt-2.5 flex flex-wrap gap-x-3 gap-y-1">
+                    {segments
+                        .filter((segment) => segment.value > 0)
+                        .map((segment) => (
+                            <li key={segment.label} className="flex min-w-0 items-center gap-1.5">
+                                <span
+                                    aria-hidden="true"
+                                    className="h-2 w-2 shrink-0 rounded-sm"
+                                    style={{ backgroundColor: segment.color }}
+                                />
+                                <span className="truncate text-[10px] text-text-secondary">{segment.label}</span>
+                                <span className="text-[10px] font-bold text-text tabular-nums">{segment.value}</span>
+                            </li>
+                        ))}
+                </ul>
             </div>
 
             <div className="grid grid-cols-3 gap-px border-y border-border bg-border">

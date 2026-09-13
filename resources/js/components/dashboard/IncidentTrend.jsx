@@ -14,8 +14,14 @@ const FILTERS = [
 
 const HEIGHT = 208;
 const PAD = { top: 18, right: 12, bottom: 26, left: 34 };
-const BRAND = 'var(--color-brand, #0d5c55)';
-const GRID = 'var(--color-border, #dbe4e2)';
+
+// The series step of the brand ramp: --color-brand itself sits below the chroma
+// floor and reads grey as a mark. Chrome is one step off the surface, solid and
+// recessive — a dashed grid reads as a threshold when it is only a grid.
+const SERIES = 'var(--color-viz-series, #068c7f)';
+const GRID = 'var(--color-viz-grid, #e3efec)';
+const AXIS = 'var(--color-viz-axis, #cbdedb)';
+const SURFACE = '#ffffff';
 
 const clamp = (value, low, high) => Math.min(Math.max(value, low), high);
 
@@ -102,6 +108,7 @@ export function IncidentTrend({ className }) {
     const gradientId = useId();
     const [severity, setSeverity] = useState('');
     const [hover, setHover] = useState(null);
+    const [showTable, setShowTable] = useState(false);
     const [plotRef, plotWidth] = useMeasuredWidth();
     const reducedMotion = useReducedMotion();
     const filterRefs = useRef([]);
@@ -202,7 +209,9 @@ export function IncidentTrend({ className }) {
 
                 <div className="flex shrink-0 items-end gap-4">
                     <div>
-                        <p className="text-[28px] leading-none font-bold tracking-[-.03em] tabular-nums">{formatNumber(total)}</p>
+                        {/* Hero figure: proportional figures — tabular-nums makes a
+                            number like 121 look loose at display sizes. */}
+                        <p className="text-[28px] leading-none font-bold tracking-[-.03em]">{formatNumber(total)}</p>
                         <p className="mt-1.5 text-[11px] text-text-muted tabular-nums">{average.toFixed(1)} a day on average</p>
                     </div>
                     {change !== null && (
@@ -224,8 +233,8 @@ export function IncidentTrend({ className }) {
                 </div>
             </header>
 
-            <div className="px-5 pt-4">
-                <div className="relative grid grid-cols-5 gap-1 rounded-xl bg-surface-muted p-1" role="radiogroup" aria-label="Filter by severity">
+            <div className="flex items-center gap-2 px-5 pt-4">
+                <div className="relative grid flex-1 grid-cols-5 gap-1 rounded-xl bg-surface-muted p-1" role="radiogroup" aria-label="Filter by severity">
                     <span
                         aria-hidden="true"
                         className="pointer-events-none absolute inset-y-1 left-1 rounded-lg bg-white shadow-sm transition-transform duration-200 ease-gov motion-reduce:transition-none"
@@ -256,6 +265,15 @@ export function IncidentTrend({ className }) {
                         </button>
                     ))}
                 </div>
+
+                <button
+                    type="button"
+                    onClick={() => setShowTable((open) => !open)}
+                    aria-pressed={showTable}
+                    className="shrink-0 rounded-lg px-2 py-1.5 text-[11px] font-semibold text-text-secondary transition-colors hover:bg-surface-muted hover:text-text focus-visible:ring-2 focus-visible:ring-brand focus-visible:outline-none"
+                >
+                    {showTable ? 'Chart' : 'Table'}
+                </button>
             </div>
 
             <div className="px-5 pt-4">
@@ -277,6 +295,26 @@ export function IncidentTrend({ className }) {
                 ) : series.length === 0 ? (
                     <div className="flex h-[208px] items-center justify-center rounded-xl bg-surface-muted">
                         <p className="text-xs text-text-secondary">No incidents recorded at this severity in the last {days} days.</p>
+                    </div>
+                ) : showTable ? (
+                    <div className="max-h-[208px] overflow-y-auto rounded-lg border border-border">
+                        <table className="w-full text-left text-xs">
+                            <caption className="sr-only">Incidents a day over the last {days} days</caption>
+                            <thead className="sticky top-0 bg-white">
+                                <tr className="border-b border-border text-[11px] text-text-muted">
+                                    <th scope="col" className="px-3 py-2 font-medium">Day</th>
+                                    <th scope="col" className="px-3 py-2 text-right font-medium">Incidents</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {series.map((point) => (
+                                    <tr key={point.date} className="border-b border-border/60 last:border-0">
+                                        <th scope="row" className="px-3 py-1.5 font-normal text-text-secondary">{formatDate(point.date)}</th>
+                                        <td className="px-3 py-1.5 text-right font-semibold tabular-nums">{point.count}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
                     </div>
                 ) : (
                     <div
@@ -300,9 +338,9 @@ export function IncidentTrend({ className }) {
                         >
                             <defs>
                                 <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="0%" stopColor={BRAND} stopOpacity="0.22" />
-                                    <stop offset="60%" stopColor={BRAND} stopOpacity="0.06" />
-                                    <stop offset="100%" stopColor={BRAND} stopOpacity="0" />
+                                    <stop offset="0%" stopColor={SERIES} stopOpacity="0.22" />
+                                    <stop offset="60%" stopColor={SERIES} stopOpacity="0.06" />
+                                    <stop offset="100%" stopColor={SERIES} stopOpacity="0" />
                                 </linearGradient>
                             </defs>
 
@@ -313,9 +351,9 @@ export function IncidentTrend({ className }) {
                                         y1={toY(tick)}
                                         x2={width - PAD.right}
                                         y2={toY(tick)}
-                                        stroke={GRID}
-                                        strokeOpacity={tick === 0 ? 1 : 0.45}
+                                        stroke={tick === 0 ? AXIS : GRID}
                                         strokeWidth="1"
+                                        shapeRendering="crispEdges"
                                     />
                                     <text x={PAD.left - 8} y={toY(tick) + 3} textAnchor="end" className="fill-text-muted text-[10px] tabular-nums">
                                         {tick}
@@ -350,8 +388,8 @@ export function IncidentTrend({ className }) {
                                 <path
                                     d={line}
                                     fill="none"
-                                    stroke={BRAND}
-                                    strokeWidth="2.5"
+                                    stroke={SERIES}
+                                    strokeWidth="2"
                                     strokeLinecap="round"
                                     strokeLinejoin="round"
                                     pathLength="1"
@@ -365,14 +403,20 @@ export function IncidentTrend({ className }) {
 
                             {active && (
                                 <g>
-                                    <line x1={active[0]} y1={PAD.top} x2={active[0]} y2={PAD.top + innerHeight} stroke={BRAND} strokeWidth="1" strokeOpacity="0.35" />
-                                    <circle cx={active[0]} cy={active[1]} r="9" fill={BRAND} fillOpacity="0.12" />
-                                    <circle cx={active[0]} cy={active[1]} r="4.5" fill="#ffffff" stroke={BRAND} strokeWidth="2.5" />
+                                    {/* No crispEdges here: snapping to the pixel grid would shift the
+                                        crosshair off the centre of the marker it annotates. */}
+                                    <line x1={active[0]} y1={PAD.top} x2={active[0]} y2={PAD.top + innerHeight} stroke={AXIS} strokeWidth="1" />
+                                    {/* 2px surface ring keeps the marker legible where it crosses the line. */}
+                                    <circle cx={active[0]} cy={active[1]} r="6" fill={SURFACE} />
+                                    <circle cx={active[0]} cy={active[1]} r="4.5" fill={SERIES} />
                                 </g>
                             )}
 
                             {!active && points.length > 0 && (
-                                <circle cx={points.at(-1)[0]} cy={points.at(-1)[1]} r="3.5" fill={BRAND} stroke="#ffffff" strokeWidth="2" />
+                                <g>
+                                    <circle cx={points.at(-1)[0]} cy={points.at(-1)[1]} r="6" fill={SURFACE} />
+                                    <circle cx={points.at(-1)[0]} cy={points.at(-1)[1]} r="4" fill={SERIES} />
+                                </g>
                             )}
                         </svg>
 
@@ -416,9 +460,12 @@ export function IncidentTrend({ className }) {
                                         )}
                                     </span>
                                 </div>
-                                <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-surface-muted">
+                                {/* Nominal categories, so every bar takes the one
+                                    series hue — colouring them by value would spend
+                                    the identity channel re-encoding bar length. */}
+                                <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-viz-track">
                                     <div
-                                        className="h-full rounded-full bg-brand transition-[width] duration-500 ease-gov motion-reduce:transition-none"
+                                        className="h-full rounded-full bg-viz-series transition-[width] duration-500 ease-gov motion-reduce:transition-none"
                                         style={{ width: `${(category.count / leading) * 100}%` }}
                                     />
                                 </div>

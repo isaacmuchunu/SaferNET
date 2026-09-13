@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import clsx from 'clsx';
 import { ArrowRightIcon, MonitorSmartphoneIcon } from 'lucide-react';
+import { Meter } from '../Primitives';
 import { formatNumber, formatPercent } from '../../lib/format';
 
 export function AttributionPanel({ metrics }) {
@@ -25,12 +26,12 @@ export function AttributionPanel({ metrics }) {
                     {devices === 0 ? 'No devices enrolled' : compliant ? 'Compliant' : 'Below county target'}
                 </span>
             </div>
-            <div className="mt-2 h-2 overflow-hidden rounded-full bg-surface-muted">
-                <div
-                    className={clsx('h-full rounded-full transition-[width] duration-500 ease-gov', compliant ? 'bg-success' : 'bg-warning')}
-                    style={{ width: `${share}%` }}
-                />
-            </div>
+            <Meter
+                value={share}
+                tone={compliant ? 'good' : 'warning'}
+                label="Share of managed devices attributed to a learner"
+                className="mt-2 h-2"
+            />
 
             <dl className="mt-4 space-y-2 text-xs">
                 <div className="flex justify-between">
