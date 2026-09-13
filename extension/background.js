@@ -518,7 +518,7 @@ function sessionFor(event, currentSession, sessionStartedAt) {
   return Date.parse(event.occurred_at) >= sessionStartedAt ? currentSession : UNATTRIBUTABLE;
 }
 
-chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message?.action === 'FORCE_SYNC_POLICY') {
     (async () => {
       const result = await syncPoliciesFromDatabase();
@@ -528,10 +528,12 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return true;
   }
 
-  // The content script reports the page it loaded on. This was previously sent
-  // and never handled, so in-page navigations went unrecorded.
+  // The content script reports the page it loaded on, which catches in-page
+  // navigations the tab events miss. It goes through the same recorder as those
+  // events — sending it straight to the queue skipped the policy check and the
+  // per-tab debounce, so every ordinary page load was recorded twice.
   if (message?.action === 'PAGE_VIEW_TELEMETRY') {
-    queueTelemetry(message.url, message.title || '');
+    recordPageView(sender.tab?.id ?? -1, message.url, message.title || '');
     sendResponse({ queued: true });
     return true;
   }
