@@ -111,12 +111,12 @@ export function SubcountiesPage() {
                 </div>
             )}
 
-            <CreateSubcountyDrawer open={creating} onClose={() => setCreating(false)} />
+            <CreateSubcountyModal open={creating} onClose={() => setCreating(false)} />
         </div>
     );
 }
 
-function CreateSubcountyDrawer({ open, onClose }) {
+function CreateSubcountyModal({ open, onClose }) {
     const create = useCreateSubcounty();
     const [name, setName] = useState('');
     const [code, setCode] = useState('');

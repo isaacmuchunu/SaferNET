@@ -126,8 +126,8 @@ export function PoliciesPage() {
                 <Pagination meta={policies.data?.meta} onChange={list.setPage} unit="policies" />
             </Panel>
 
-            <PolicyRulesDrawer policy={selected} onClose={() => setSelected(null)} canManage={can.managePolicies} isCde={isCde} />
-            <PolicyDrawer policy={editing} onClose={() => setEditing(null)} isCde={isCde} />
+            <PolicyRulesModal policy={selected} onClose={() => setSelected(null)} canManage={can.managePolicies} isCde={isCde} />
+            <PolicyModal policy={editing} onClose={() => setEditing(null)} isCde={isCde} />
         </div>
     );
 }
@@ -136,7 +136,7 @@ export function PoliciesPage() {
 
 const EMPTY_POLICY = { name: '', level: 'institution', status: 'draft' };
 
-function PolicyDrawer({ policy, onClose, isCde }) {
+function PolicyModal({ policy, onClose, isCde }) {
     const save = useSaveFilteringPolicy();
     const [form, setForm] = useState(EMPTY_POLICY);
     const isEdit = Boolean(policy?.id);
@@ -234,7 +234,7 @@ const EMPTY_RULE = {
     notify_immediately: false,
 };
 
-function PolicyRulesDrawer({ policy, onClose, canManage, isCde }) {
+function PolicyRulesModal({ policy, onClose, canManage, isCde }) {
     const rules = usePolicyRules(policy?.id);
     const categories = useContentCategories();
     const saveRule = useSavePolicyRule();
