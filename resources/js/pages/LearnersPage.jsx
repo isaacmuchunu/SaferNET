@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import clsx from 'clsx';
 import {
@@ -96,7 +96,9 @@ export function LearnersPage() {
     const removeLearner = useDeleteLearner();
     const removeGroup = useDeleteLearnerGroup();
 
-    const rows = learners.data?.data ?? [];
+    // Memoised because it feeds an effect dependency below: a fresh array each
+    // render re-runs that effect every render.
+    const rows = useMemo(() => learners.data?.data ?? [], [learners.data]);
 
     /*
      * A device record links here with ?learner=<id>.
