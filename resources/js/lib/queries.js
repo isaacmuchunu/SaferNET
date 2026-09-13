@@ -45,6 +45,15 @@ export const useInstitution = (id) => useRecord('institutions', api.institutions
 export const useUsers = (params, options) => useCollection('users', api.users.list, params, options);
 export const useLearners = (params, options) => useCollection('learners', api.learners.list, params, options);
 export const useLearnerGroups = (params, options) => useCollection('learner-groups', api.learnerGroups.list, params, options);
+
+/** One learner with their devices, sessions and activity totals. */
+export const useLearner = (id, options) =>
+    useQuery({
+        queryKey: ['learner', id],
+        queryFn: ({ signal }) => api.learners.show(id, signal).then((p) => p.data),
+        enabled: Boolean(id),
+        ...options,
+    });
 export const useLaboratories = (params, options) => useCollection('laboratories', api.laboratories.list, params, options);
 export const useDeviceGroups = (params, options) => useCollection('device-groups', api.deviceGroups.list, params, options);
 export const useDevices = (params, options) => useCollection('devices', api.devices.list, params, options);

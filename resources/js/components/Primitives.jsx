@@ -300,11 +300,36 @@ export function DataTable({ columns, query, rows, children, empty, minWidth = '8
     );
 }
 
+/**
+ * A table row, optionally activatable.
+ *
+ * A row that opens something must be reachable without a mouse, so a clickable
+ * row takes focus and responds to Enter and Space like the button it behaves
+ * as. A plain `tr` with a click handler is invisible to keyboard and screen
+ * reader users, which for a learner or device profile means the record simply
+ * cannot be opened.
+ */
 export function Row({ onClick, className, children }) {
+    function onKeyDown(event) {
+        if (!onClick) return;
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+
+        // Space scrolls the page by default, which is not what a row press means.
+        event.preventDefault();
+        onClick(event);
+    }
+
     return (
         <tr
             onClick={onClick}
-            className={clsx('text-xs transition-colors duration-150 ease-gov', onClick && 'cursor-pointer hover:bg-brand-soft/60', className)}
+            onKeyDown={onKeyDown}
+            tabIndex={onClick ? 0 : undefined}
+            role={onClick ? 'button' : undefined}
+            className={clsx(
+                'text-xs transition-colors duration-150 ease-gov',
+                onClick && 'cursor-pointer hover:bg-brand-soft/60 focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-inset focus-visible:outline-none',
+                className,
+            )}
         >
             {children}
         </tr>

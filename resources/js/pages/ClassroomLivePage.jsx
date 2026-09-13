@@ -31,105 +31,20 @@ import {
     TextInput,
 } from '../components/Primitives';
 import { Drawer } from '../components/Overlays';
+import { BrowsingHistory } from '../components/BrowsingHistory';
 import {
     useClassroomFocusMode,
     useClassroomLive,
     useClassroomNudge,
     useClassroomPushUrl,
-    useWebEvents,
 } from '../lib/queries';
 import { useScope } from '../lib/scope';
-import { formatNumber, formatRelative, titleCase } from '../lib/format';
+import { formatNumber, formatRelative } from '../lib/format';
 import { showToast, toastError } from '../lib/toast';
 
 // A workstation that has not reported for this long is shown as silent rather
 // than as continuing to do whatever it was last seen doing.
 const STALE_AFTER_MS = 5 * 60 * 1000;
-
-/**
- * One learner's recent browsing, newest first.
- *
- * Every row is a real page a named child visited, so the panel states the
- * session it belongs to and keeps blocks visually distinct — this is the view
- * a safeguarding conversation is actually held over.
- */
-function LearnerHistory({ tile }) {
-    const [onlyBlocks, setOnlyBlocks] = useState(false);
-
-    const history = useWebEvents({
-        learner_id: tile.learner_id,
-        ...(onlyBlocks ? { action: 'block' } : {}),
-    });
-
-    const events = history.data?.data ?? [];
-    const total = history.data?.meta?.total ?? 0;
-
-    return (
-        <div className="space-y-3">
-            <div className="flex items-center justify-between gap-3">
-                <p className="text-xs text-text-secondary">
-                    {history.isPending ? 'Loading…' : `${formatNumber(total)} recorded ${total === 1 ? 'page' : 'pages'}`}
-                </p>
-                <Button
-                    size="sm"
-                    variant={onlyBlocks ? 'primary' : 'secondary'}
-                    onClick={() => setOnlyBlocks((only) => !only)}
-                >
-                    {onlyBlocks ? 'Showing blocks' : 'Blocks only'}
-                </Button>
-            </div>
-
-            {history.isPending ? (
-                <div className="space-y-2">
-                    {[1, 2, 3, 4, 5].map((row) => <Skeleton key={row} className="h-12 w-full rounded-lg" />)}
-                </div>
-            ) : events.length === 0 ? (
-                <EmptyState
-                    icon={GlobeIcon}
-                    title="Nothing recorded yet"
-                    description={
-                        onlyBlocks
-                            ? 'This learner has not been blocked in the recorded history.'
-                            : 'No browsing has been reported for this learner yet.'
-                    }
-                />
-            ) : (
-                <ul className="divide-y divide-border rounded-lg border border-border">
-                    {events.map((event) => (
-                        <li key={event.id} className="flex items-start gap-3 p-2.5">
-                            <span
-                                aria-hidden="true"
-                                className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${
-                                    event.action === 'block' ? 'bg-danger' : event.action === 'restrict' ? 'bg-warning' : 'bg-success'
-                                }`}
-                            />
-                            <div className="min-w-0 flex-1">
-                                <div className="flex items-baseline justify-between gap-2">
-                                    <span className="truncate text-xs font-semibold text-text" title={event.domain}>
-                                        {event.domain}
-                                    </span>
-                                    <span className="shrink-0 text-[10px] text-text-muted">
-                                        {formatRelative(event.occurred_at)}
-                                    </span>
-                                </div>
-                                <p className="mt-0.5 truncate text-[11px] text-text-secondary" title={event.url}>
-                                    {event.page_title || event.url}
-                                </p>
-                                <div className="mt-1 flex flex-wrap items-center gap-x-2 text-[10px] text-text-muted">
-                                    <span className={event.action === 'block' ? 'font-semibold text-danger' : ''}>
-                                        {titleCase(event.action)}
-                                    </span>
-                                    {event.category && <><span aria-hidden="true">·</span><span>{event.category}</span></>}
-                                    {event.reason && <><span aria-hidden="true">·</span><span className="truncate">{event.reason}</span></>}
-                                </div>
-                            </div>
-                        </li>
-                    ))}
-                </ul>
-            )}
-        </div>
-    );
-}
 
 /** Sort order for the tile grid: what needs a teacher's attention comes first. */
 function attentionRank(tile) {
@@ -686,7 +601,7 @@ export function ClassroomLivePage() {
                         : undefined
                 }
             >
-                {historyFor && <LearnerHistory tile={historyFor} />}
+                {historyFor && <BrowsingHistory learnerId={historyFor.learner_id} />}
             </Drawer>
 
             {/* Push Resource URL Drawer */}
