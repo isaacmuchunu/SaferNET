@@ -11,6 +11,15 @@ use Symfony\Component\HttpFoundation\Response;
 
 class IncidentPdfReportController extends Controller
 {
+    /**
+     * How many web events the dossier prints.
+     *
+     * A dossier is signed off and used in a safeguarding process, so where the
+     * evidence is longer than this the document must say so rather than quietly
+     * ending — the reader has to know they are looking at an extract.
+     */
+    public const EvidenceLimit = 15;
+
     public function show(Request $request, string $incident): Response
     {
         $user = $request->user();
@@ -23,8 +32,9 @@ class IncidentPdfReportController extends Controller
                 'device',
                 'category',
                 'actions.actor',
-                'webEvents' => fn ($query) => $query->latest('occurred_at')->limit(15),
+                'webEvents' => fn ($query) => $query->latest('occurred_at')->limit(self::EvidenceLimit),
             ])
+            ->withCount('webEvents')
             ->where('public_id', $incident)
             ->firstOrFail();
 
