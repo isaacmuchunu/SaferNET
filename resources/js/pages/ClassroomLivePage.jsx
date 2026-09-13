@@ -16,6 +16,7 @@ import {
     SendIcon,
     SparklesIcon,
     UnlockIcon,
+    WifiIcon,
     WifiOffIcon,
 } from 'lucide-react';
 import { PageHeader } from '../components/PageHeader';
@@ -35,14 +36,100 @@ import {
     useClassroomLive,
     useClassroomNudge,
     useClassroomPushUrl,
+    useWebEvents,
 } from '../lib/queries';
 import { useScope } from '../lib/scope';
-import { formatNumber, formatRelative } from '../lib/format';
+import { formatNumber, formatRelative, titleCase } from '../lib/format';
 import { showToast, toastError } from '../lib/toast';
 
 // A workstation that has not reported for this long is shown as silent rather
 // than as continuing to do whatever it was last seen doing.
 const STALE_AFTER_MS = 5 * 60 * 1000;
+
+/**
+ * One learner's recent browsing, newest first.
+ *
+ * Every row is a real page a named child visited, so the panel states the
+ * session it belongs to and keeps blocks visually distinct — this is the view
+ * a safeguarding conversation is actually held over.
+ */
+function LearnerHistory({ tile }) {
+    const [onlyBlocks, setOnlyBlocks] = useState(false);
+
+    const history = useWebEvents({
+        learner_id: tile.learner_id,
+        ...(onlyBlocks ? { action: 'block' } : {}),
+    });
+
+    const events = history.data?.data ?? [];
+    const total = history.data?.meta?.total ?? 0;
+
+    return (
+        <div className="space-y-3">
+            <div className="flex items-center justify-between gap-3">
+                <p className="text-xs text-text-secondary">
+                    {history.isPending ? 'Loading…' : `${formatNumber(total)} recorded ${total === 1 ? 'page' : 'pages'}`}
+                </p>
+                <Button
+                    size="sm"
+                    variant={onlyBlocks ? 'primary' : 'secondary'}
+                    onClick={() => setOnlyBlocks((only) => !only)}
+                >
+                    {onlyBlocks ? 'Showing blocks' : 'Blocks only'}
+                </Button>
+            </div>
+
+            {history.isPending ? (
+                <div className="space-y-2">
+                    {[1, 2, 3, 4, 5].map((row) => <Skeleton key={row} className="h-12 w-full rounded-lg" />)}
+                </div>
+            ) : events.length === 0 ? (
+                <EmptyState
+                    icon={GlobeIcon}
+                    title="Nothing recorded yet"
+                    description={
+                        onlyBlocks
+                            ? 'This learner has not been blocked in the recorded history.'
+                            : 'No browsing has been reported for this learner yet.'
+                    }
+                />
+            ) : (
+                <ul className="divide-y divide-border rounded-lg border border-border">
+                    {events.map((event) => (
+                        <li key={event.id} className="flex items-start gap-3 p-2.5">
+                            <span
+                                aria-hidden="true"
+                                className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${
+                                    event.action === 'block' ? 'bg-danger' : event.action === 'restrict' ? 'bg-warning' : 'bg-success'
+                                }`}
+                            />
+                            <div className="min-w-0 flex-1">
+                                <div className="flex items-baseline justify-between gap-2">
+                                    <span className="truncate text-xs font-semibold text-text" title={event.domain}>
+                                        {event.domain}
+                                    </span>
+                                    <span className="shrink-0 text-[10px] text-text-muted">
+                                        {formatRelative(event.occurred_at)}
+                                    </span>
+                                </div>
+                                <p className="mt-0.5 truncate text-[11px] text-text-secondary" title={event.url}>
+                                    {event.page_title || event.url}
+                                </p>
+                                <div className="mt-1 flex flex-wrap items-center gap-x-2 text-[10px] text-text-muted">
+                                    <span className={event.action === 'block' ? 'font-semibold text-danger' : ''}>
+                                        {titleCase(event.action)}
+                                    </span>
+                                    {event.category && <><span aria-hidden="true">·</span><span>{event.category}</span></>}
+                                    {event.reason && <><span aria-hidden="true">·</span><span className="truncate">{event.reason}</span></>}
+                                </div>
+                            </div>
+                        </li>
+                    ))}
+                </ul>
+            )}
+        </div>
+    );
+}
 
 /** Sort order for the tile grid: what needs a teacher's attention comes first. */
 function attentionRank(tile) {
@@ -99,6 +186,17 @@ function tileAppearance(tile) {
     };
 }
 
+/** "live 4m" / "live 1h 12m" — how long this learner's session has been open. */
+function liveFor(seconds) {
+    if (seconds === null || seconds === undefined) return null;
+
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 1) return 'just signed in';
+    if (minutes < 60) return `live ${minutes}m`;
+
+    return `live ${Math.floor(minutes / 60)}h ${minutes % 60}m`;
+}
+
 function focusTone(score) {
     if (score >= 80) return { text: 'text-success', meter: 'good' };
     if (score >= 50) return { text: 'text-warning-strong', meter: 'warning' };
@@ -115,6 +213,7 @@ export function ClassroomLivePage() {
     const [targetTitle, setTargetTitle] = useState('Lesson Resource');
     const [nudgeMessage, setNudgeMessage] = useState('Please focus on the classroom lesson.');
     const [focusUrl, setFocusUrl] = useState('');
+    const [historyFor, setHistoryFor] = useState(null);
 
     const queryParams = {
         laboratory_id: selectedLab || undefined,
@@ -143,6 +242,12 @@ export function ClassroomLivePage() {
     // Presenting its last known page as current activity is how a monitor comes
     // to show a quiet room as fully on task.
     const tiles = (data.tiles ?? []).map((tile) => {
+        // The server decides this, so every tile is judged against one clock.
+        // The local fallback only covers an older API that does not send it.
+        if (typeof tile.is_reporting === 'boolean') {
+            return { ...tile, isStale: !tile.is_reporting };
+        }
+
         const lastActivity = tile.last_activity_at ? new Date(tile.last_activity_at) : null;
         const silentMs = lastActivity ? Date.now() - lastActivity.getTime() : Infinity;
 
@@ -509,15 +614,28 @@ export function ClassroomLivePage() {
                                         </div>
                                     </div>
 
-                                    {/* A silent workstation is saying nothing, which is not the
+                                    {/* Whether this workstation is reporting right now, said
+                                        plainly. A silent one is saying nothing, which is not the
                                         same as saying everything is fine. */}
-                                    {tile.isStale && (
+                                    {tile.isStale ? (
                                         <p className="mt-2.5 flex items-start gap-1.5 text-[11px] text-text-muted">
                                             <WifiOffIcon className="mt-px h-3 w-3 shrink-0" aria-hidden="true" />
                                             <span>
                                                 Last reported {formatRelative(tile.last_activity_at)}. The page above may no
                                                 longer be what is on screen.
                                             </span>
+                                        </p>
+                                    ) : (
+                                        <p className="mt-2.5 flex items-center gap-1.5 text-[11px] text-success">
+                                            <span className="relative flex h-2 w-2" aria-hidden="true">
+                                                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success opacity-60 motion-reduce:animate-none" />
+                                                <span className="relative inline-flex h-2 w-2 rounded-full bg-success" />
+                                            </span>
+                                            <WifiIcon className="h-3 w-3 shrink-0" aria-hidden="true" />
+                                            <span className="font-medium">Reporting</span>
+                                            {liveFor(tile.live_for_seconds) && (
+                                                <span className="text-text-muted">· {liveFor(tile.live_for_seconds)}</span>
+                                            )}
                                         </p>
                                     )}
                                 </div>
@@ -542,7 +660,13 @@ export function ClassroomLivePage() {
 
                                     <div className="mt-2 flex items-center justify-between gap-2 text-[10px] text-text-muted">
                                         <span className="truncate">{tile.laboratory_name}</span>
-                                        <span className="shrink-0">{formatRelative(tile.last_activity_at)}</span>
+                                        <button
+                                            type="button"
+                                            onClick={() => setHistoryFor(tile)}
+                                            className="shrink-0 font-medium text-brand underline-offset-2 hover:underline focus-visible:ring-2 focus-visible:ring-brand focus-visible:outline-none"
+                                        >
+                                            Browsing history
+                                        </button>
                                     </div>
                                 </div>
                             </li>
@@ -550,6 +674,20 @@ export function ClassroomLivePage() {
                     })}
                 </ul>
             )}
+
+            {/* Browsing history for one learner */}
+            <Drawer
+                open={historyFor !== null}
+                onClose={() => setHistoryFor(null)}
+                title={historyFor ? `${historyFor.learner_name} — browsing history` : 'Browsing history'}
+                subtitle={
+                    historyFor
+                        ? `${historyFor.admission_number} · ${historyFor.device_name} · session started ${formatRelative(historyFor.session_started_at)}`
+                        : undefined
+                }
+            >
+                {historyFor && <LearnerHistory tile={historyFor} />}
+            </Drawer>
 
             {/* Push Resource URL Drawer */}
             <Drawer

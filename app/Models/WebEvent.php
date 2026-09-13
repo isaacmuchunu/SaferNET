@@ -23,6 +23,16 @@ class WebEvent extends Model
         return $this->belongsTo(LearnerSession::class);
     }
 
+    public function learner(): BelongsTo
+    {
+        return $this->belongsTo(Learner::class);
+    }
+
+    public function device(): BelongsTo
+    {
+        return $this->belongsTo(Device::class);
+    }
+
     public function incident(): BelongsTo
     {
         return $this->belongsTo(Incident::class);

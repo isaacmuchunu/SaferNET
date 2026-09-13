@@ -21,4 +21,22 @@ return [
 
     'focus_window_minutes' => (int) env('CLASSROOM_FOCUS_WINDOW_MINUTES', 60),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Reporting freshness
+    |--------------------------------------------------------------------------
+    |
+    | How recently a workstation must have reported activity to count as live.
+    | A tile that has gone quiet for longer shows as not reporting: the page it
+    | last displayed is the last thing that was *seen*, not necessarily what is
+    | on screen now, and a monitor that cannot tell those apart lets a quiet
+    | room read as a compliant one.
+    |
+    | Kept a little above the extension's 30-second command poll so an ordinary
+    | gap between events does not flicker the indicator.
+    |
+    */
+
+    'reporting_within_seconds' => (int) env('CLASSROOM_REPORTING_WITHIN_SECONDS', 120),
+
 ];

@@ -49,9 +49,16 @@ class ClassroomLiveController extends Controller
         $latestEvents = $this->latestEventPerSession($sessionIds);
         $eventCounts = $this->recentEventCounts($sessionIds);
 
-        $tiles = $activeSessions->map(function (LearnerSession $session) use ($latestEvents, $eventCounts, $institutionId) {
+        $reportingSince = now()->subSeconds((int) config('classroom.reporting_within_seconds'));
+
+        $tiles = $activeSessions->map(function (LearnerSession $session) use ($latestEvents, $eventCounts, $institutionId, $reportingSince) {
             $latestEvent = $latestEvents->get($session->id);
             $isLocked = self::focusState($institutionId, $session->device?->laboratory_id)['locked'];
+
+            // Whether the workstation is reporting *now*, judged on the server so
+            // every tile is measured against one clock.
+            $lastActivityAt = $session->last_activity_at ?? $session->started_at;
+            $isReporting = $lastActivityAt !== null && $lastActivityAt->greaterThanOrEqualTo($reportingSince);
 
             $action = $latestEvent?->action instanceof EnforcementAction
                 ? $latestEvent->action->value
@@ -81,7 +88,14 @@ class ClassroomLiveController extends Controller
                 'category' => $latestEvent?->category?->name ?? 'Unclassified',
                 'status' => $status,
                 'focus_score' => $focusScore,
-                'last_activity_at' => $session->last_activity_at?->toISOString() ?? $session->started_at?->toISOString(),
+                'is_reporting' => $isReporting,
+                'events_in_window' => $totalCount,
+                'blocked_in_window' => $blockedCount,
+                // When this learner's session began, and how long it has been
+                // live — the question a teacher actually asks of a lab.
+                'session_started_at' => $session->started_at?->toISOString(),
+                'live_for_seconds' => $session->started_at === null ? null : (int) $session->started_at->diffInSeconds(now()),
+                'last_activity_at' => $lastActivityAt?->toISOString(),
             ];
         });
 

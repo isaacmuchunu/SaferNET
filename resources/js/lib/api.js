@@ -214,6 +214,7 @@ export const api = {
     users: resource('/users'),
     learnerGroups: resource('/learner-groups'),
     learners: resource('/learners'),
+    webEvents: (query, signal) => request('/web-events', { query, signal }),
     laboratories: resource('/laboratories'),
     deviceGroups: resource('/device-groups'),
     devices: resource('/devices'),
