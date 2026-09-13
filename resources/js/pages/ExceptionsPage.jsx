@@ -16,7 +16,7 @@ import {
     Textarea,
     firstError,
 } from '../components/Primitives';
-import { Drawer } from '../components/Overlays';
+import { Modal } from '../components/Overlays';
 import { StatusPill } from '../components/StatusPill';
 import { useListState } from '../lib/hooks';
 import { useAuth } from '../lib/auth';
@@ -153,12 +153,12 @@ function RequestDrawer({ open, onClose }) {
     }
 
     return (
-        <Drawer
+        <Modal
             open={open}
             onClose={onClose}
             title="Request a filtering exception"
             subtitle="Ask for a blocked domain to be released for classroom instruction."
-            width="max-w-md"
+            size="sm"
             footer={
                 <>
                     <Button className="flex-1" onClick={onClose} disabled={create.isPending}>
@@ -191,7 +191,7 @@ function RequestDrawer({ open, onClose }) {
                     <TextInput type="date" value={form.expires_at} onChange={set('expires_at')} />
                 </Field>
             </form>
-        </Drawer>
+        </Modal>
     );
 }
 
@@ -233,12 +233,12 @@ function ReviewExceptionDrawer({ request, onClose }) {
     }
 
     return (
-        <Drawer
+        <Modal
             open={Boolean(request)}
             onClose={onClose}
             title={request?.domain ?? ''}
             subtitle="Exception request review"
-            width="max-w-md"
+            size="sm"
             footer={
                 <>
                     <Button className="flex-1" onClick={onClose} disabled={review.isPending}>
@@ -278,6 +278,6 @@ function ReviewExceptionDrawer({ request, onClose }) {
                     </Field>
                 </form>
             )}
-        </Drawer>
+        </Modal>
     );
 }

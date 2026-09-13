@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import clsx from 'clsx';
 import { CircleCheckIcon, CircleSlashIcon, Undo2Icon } from 'lucide-react';
 import { Button, DetailRow, Field, Textarea, firstError } from '../../components/Primitives';
-import { ConfirmDialog, Drawer } from '../../components/Overlays';
+import { ConfirmDialog, Modal } from '../../components/Overlays';
 import { useReviewInstitution } from '../../lib/queries';
 import { INSTITUTION_TYPES, OWNERSHIP_TYPES } from '../../lib/domain';
 import { formatDate, formatNumber } from '../../lib/format';
@@ -45,7 +45,7 @@ const ICON_TONE = { brand: 'text-brand', warning: 'text-warning-strong', danger:
  * County Director review of a pending registration. Notes are mandatory for
  * any decision other than approval, mirroring the server-side rule.
  */
-export function ReviewDrawer({ institution, onClose, onReviewed }) {
+export function ReviewModal({ institution, onClose, onReviewed }) {
     const review = useReviewInstitution();
     const [decision, setDecision] = useState('approve');
     const [notes, setNotes] = useState('');
@@ -89,7 +89,8 @@ export function ReviewDrawer({ institution, onClose, onReviewed }) {
 
     return (
         <>
-            <Drawer
+            <Modal
+                size="lg"
                 open={Boolean(institution)}
                 onClose={onClose}
                 title={institution?.name ?? ''}
@@ -177,7 +178,7 @@ export function ReviewDrawer({ institution, onClose, onReviewed }) {
                         </p>
                     </div>
                 )}
-            </Drawer>
+            </Modal>
 
             <ConfirmDialog
                 open={confirming}

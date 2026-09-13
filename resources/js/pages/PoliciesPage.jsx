@@ -17,7 +17,7 @@ import {
     TextInput,
     firstError,
 } from '../components/Primitives';
-import { ConfirmDialog, Drawer } from '../components/Overlays';
+import { ConfirmDialog, Modal } from '../components/Overlays';
 import { StatusPill } from '../components/StatusPill';
 import { useListState } from '../lib/hooks';
 import { useAuth } from '../lib/auth';
@@ -171,12 +171,12 @@ function PolicyDrawer({ policy, onClose, isCde }) {
     }
 
     return (
-        <Drawer
+        <Modal
             open={Boolean(policy)}
             onClose={onClose}
             title={isEdit ? policy.name : 'New filtering policy'}
             subtitle="Policies inherit from the county baseline."
-            width="max-w-md"
+            size="sm"
             footer={
                 <>
                     <Button className="flex-1" onClick={onClose} disabled={save.isPending}>
@@ -217,7 +217,7 @@ function PolicyDrawer({ policy, onClose, isCde }) {
                     </Select>
                 </Field>
             </form>
-        </Drawer>
+        </Modal>
     );
 }
 
@@ -308,12 +308,12 @@ function PolicyRulesDrawer({ policy, onClose, canManage, isCde }) {
 
     return (
         <>
-            <Drawer
+            <Modal
                 open={Boolean(policy)}
                 onClose={onClose}
                 title={policy?.name ?? ''}
                 subtitle={policy ? `${POLICY_LEVELS[policy.level] ?? policy.level} policy · version ${policy.version}` : undefined}
-                width="max-w-2xl"
+                size="lg"
                 footer={
                     <Button className="ml-auto" onClick={onClose}>
                         Close
@@ -475,7 +475,7 @@ function PolicyRulesDrawer({ policy, onClose, canManage, isCde }) {
                         )}
                     </div>
                 )}
-            </Drawer>
+            </Modal>
 
             <ConfirmDialog
                 open={Boolean(pendingDelete)}

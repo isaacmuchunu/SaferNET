@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { MapPinIcon, PlusIcon } from 'lucide-react';
 import { PageHeader } from '../components/PageHeader';
 import { Button, EmptyState, ErrorState, Field, Meter, Panel, Skeleton, TextInput, coverageTone, firstError } from '../components/Primitives';
-import { Drawer } from '../components/Overlays';
+import { Modal } from '../components/Overlays';
 import { StatusPill } from '../components/StatusPill';
 import { useAuth } from '../lib/auth';
 import { useCreateSubcounty, useSubcounties } from '../lib/queries';
@@ -149,12 +149,12 @@ function CreateSubcountyDrawer({ open, onClose }) {
     }
 
     return (
-        <Drawer
+        <Modal
             open={open}
             onClose={onClose}
             title="Add a sub-county"
             subtitle="Only the County Director of Education may change the county structure."
-            width="max-w-md"
+            size="sm"
             footer={
                 <>
                     <Button className="flex-1" onClick={onClose} disabled={create.isPending}>
@@ -205,6 +205,6 @@ function CreateSubcountyDrawer({ open, onClose }) {
                     />
                 </Field>
             </form>
-        </Drawer>
+        </Modal>
     );
 }

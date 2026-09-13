@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { CalendarIcon, ClipboardCheckIcon, GavelIcon } from 'lucide-react';
 import { PageHeader } from '../components/PageHeader';
 import { Button, EmptyState, ErrorState, Pagination, Panel, Skeleton } from '../components/Primitives';
-import { ReviewDrawer } from './approvals/ReviewDrawer';
+import { ReviewModal } from './approvals/ReviewModal';
 import { useListState } from '../lib/hooks';
 import { useInstitutions } from '../lib/queries';
 import { INSTITUTION_TYPES, OWNERSHIP_TYPES } from '../lib/domain';
@@ -85,7 +85,7 @@ export function ApprovalsPage() {
                 </div>
             )}
 
-            <ReviewDrawer institution={underReview} onClose={() => setUnderReview(null)} />
+            <ReviewModal institution={underReview} onClose={() => setUnderReview(null)} />
         </div>
     );
 }

@@ -16,7 +16,7 @@ import {
     TextInput,
     firstError,
 } from '../components/Primitives';
-import { ConfirmDialog, Drawer } from '../components/Overlays';
+import { ConfirmDialog, Modal } from '../components/Overlays';
 import { StatusPill } from '../components/StatusPill';
 import { UserAvatar } from '../components/UserAvatar';
 import { useDebouncedValue, useListState } from '../lib/hooks';
@@ -213,12 +213,12 @@ function OfficerDrawer({ officer, onClose, actor }) {
     }
 
     return (
-        <Drawer
+        <Modal
             open={Boolean(officer)}
             onClose={onClose}
             title={isEdit ? officer.name : 'Provision an officer'}
             subtitle={isEdit ? officer.email : 'SAFERNET generates and sends secure first-sign-in credentials.'}
-            width="max-w-md"
+            size="sm"
             footer={
                 <>
                     <Button className="flex-1" onClick={onClose} disabled={save.isPending}>
@@ -286,7 +286,7 @@ function OfficerDrawer({ officer, onClose, actor }) {
                     </p>
                 )}
             </form>
-        </Drawer>
+        </Modal>
     );
 }
 

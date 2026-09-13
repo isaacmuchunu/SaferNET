@@ -30,7 +30,7 @@ import {
     Skeleton,
     TextInput,
 } from '../components/Primitives';
-import { Drawer } from '../components/Overlays';
+import { Modal } from '../components/Overlays';
 import { BrowsingHistory } from '../components/BrowsingHistory';
 import {
     useClassroomFocusMode,
@@ -591,7 +591,8 @@ export function ClassroomLivePage() {
             )}
 
             {/* Browsing history for one learner */}
-            <Drawer
+            <Modal
+                size="lg"
                 open={historyFor !== null}
                 onClose={() => setHistoryFor(null)}
                 title={historyFor ? `${historyFor.learner_name} — browsing history` : 'Browsing history'}
@@ -602,10 +603,10 @@ export function ClassroomLivePage() {
                 }
             >
                 {historyFor && <BrowsingHistory learnerId={historyFor.learner_id} />}
-            </Drawer>
+            </Modal>
 
             {/* Push Resource URL Drawer */}
-            <Drawer
+            <Modal
                 open={pushModalOpen}
                 onClose={() => setPushModalOpen(false)}
                 title="Broadcast Learning Resource to Class"
@@ -659,7 +660,7 @@ export function ClassroomLivePage() {
                         </Button>
                     </div>
                 </form>
-            </Drawer>
+            </Modal>
         </div>
     );
 }
