@@ -26,7 +26,13 @@ param(
     [string]$UpstreamDns = '1.1.1.1',
     [string]$Source = $PSScriptRoot,
     [int]$ReadinessTimeoutSeconds = 45,
-    [switch]$ConfigureDns
+    [switch]$ConfigureDns,
+
+    # Chrome Web Store id of SaferNET Shield. Supplying it force-installs the
+    # extension for every user on this machine.
+    [string]$ExtensionId,
+    [string]$ExtensionUpdateUrl = 'https://clients2.google.com/service/update2/crx',
+    [switch]$ForceInstallExtension
 )
 
 $ErrorActionPreference = 'Stop'
@@ -131,6 +137,50 @@ function Save-DnsBackup {
     } else {
         Write-Host "Keeping the existing DNS backup at $Path (captured before this machine was redirected)."
     }
+}
+
+function Set-ForcedExtension {
+    <#
+        Force-installs the browser extension through Chrome policy.
+
+        This is the only thing that actually stops a learner removing it. An
+        extension cannot defend itself: anything installed normally can be
+        switched off from chrome://extensions in two clicks, and no amount of
+        extension code changes that. Listed in ExtensionInstallForcelist, its
+        Remove and Disable controls are greyed out and the browser reinstalls it
+        if the files are deleted.
+
+        It is not a complete answer either. A learner who opens a different
+        browser is outside Chrome policy entirely — which is why the endpoint
+        agent filters at DNS, below whichever browser they choose. The extension
+        is the layer that sees page titles and classroom state; the agent is the
+        layer that cannot be walked around.
+    #>
+    param(
+        [Parameter(Mandatory)][string]$Id,
+        [Parameter(Mandatory)][string]$UpdateUrl
+    )
+
+    $policyKey = 'HKLM:\SOFTWARE\Policies\Google\Chrome\ExtensionInstallForcelist'
+    if (-not (Test-Path $policyKey)) { New-Item -Path $policyKey -Force | Out-Null }
+
+    $entry = "$Id;$UpdateUrl"
+    $existing = (Get-Item $policyKey).GetValueNames() | ForEach-Object {
+        [pscustomobject]@{ Name = $_; Value = (Get-ItemProperty -Path $policyKey -Name $_).$_ }
+    }
+
+    if ($existing | Where-Object { $_.Value -eq $entry }) {
+        Write-Host 'The extension is already force-installed by policy.'
+        return
+    }
+
+    # Entries are numbered strings; take the next free slot rather than
+    # overwriting another product's policy.
+    $used = @($existing | ForEach-Object { [int]$_.Name } | Where-Object { $_ -gt 0 })
+    $slot = if ($used) { ($used | Measure-Object -Maximum).Maximum + 1 } else { 1 }
+
+    New-ItemProperty -Path $policyKey -Name "$slot" -Value $entry -PropertyType String -Force | Out-Null
+    Write-Host "Force-installed the extension by policy (slot $slot). Learners cannot remove or disable it."
 }
 
 function Wait-AgentReady {
@@ -286,6 +336,14 @@ if ($ConfigureDns) {
         }
 
         throw
+    }
+}
+
+if ($ForceInstallExtension) {
+    if (-not $ExtensionId) {
+        Write-Warning 'ForceInstallExtension was requested without an ExtensionId, so no browser policy was written. The extension remains removable by the learner.'
+    } else {
+        Set-ForcedExtension -Id $ExtensionId -UpdateUrl $ExtensionUpdateUrl
     }
 }
 

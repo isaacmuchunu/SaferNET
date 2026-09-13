@@ -132,6 +132,23 @@ class AppServiceProvider extends ServiceProvider
             'telemetry:'.($request->user()?->currentAccessToken()?->id ?? $request->user()?->id ?? $request->ip())
         ));
 
+        /*
+         | A learner PIN is short by design, so the only thing standing between
+         | it and a guess-everything attack is how many guesses are allowed.
+         | Limited on two axes: one workstation cannot grind through PINs, and
+         | one learner's PIN cannot be attacked from a room full of machines.
+         */
+        RateLimiter::for('workstation-signin', fn (Request $request) => [
+            Limit::perMinutes(15, 5)->by('signin-device:'.(
+                $request->input('workstation_id')
+                ?? $request->input('device_id')
+                ?? $request->ip()
+            )),
+            Limit::perMinutes(15, 5)->by('signin-learner:'.(
+                $request->input('learner_number') ?? $request->ip()
+            )),
+        ]);
+
         foreach ([
             AuditLog::class,
             DeviceGroup::class,
