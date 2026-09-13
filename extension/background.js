@@ -302,16 +302,26 @@ const PAGE_VIEW_DEBOUNCE_MS = 4000;
  * learner's history — the opposite of what happened, in the record most likely
  * to be read back during a safeguarding conversation.
  */
-async function recordPageView(tabId, url, title) {
-  const config = await chrome.storage.local.get(['blocked_domains', 'allowed_domains']);
-  if (policyBlocks(url, config)) return;
-
+function recordPageView(tabId, url, title) {
+  // Claimed synchronously, before any await. onUpdated and onActivated fire for
+  // the same navigation within milliseconds of each other; checking after an
+  // await lets both pass the guard and record the page twice.
   const previous = lastPageView.get(tabId);
   const now = Date.now();
 
-  if (previous && previous.url === url && now - previous.at < PAGE_VIEW_DEBOUNCE_MS) return;
+  if (previous && previous.url === url && now - previous.at < PAGE_VIEW_DEBOUNCE_MS) {
+    return Promise.resolve();
+  }
 
   lastPageView.set(tabId, { url, at: now });
+
+  return storePageView(url, title);
+}
+
+async function storePageView(url, title) {
+  const config = await chrome.storage.local.get(['blocked_domains', 'allowed_domains']);
+  if (policyBlocks(url, config)) return;
+
   await queueTelemetry(url, title);
 }
 

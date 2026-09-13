@@ -27,6 +27,7 @@
         .records th, .records td { padding: 1.3mm 1.5mm; border: .6pt solid #64748b; vertical-align: top; overflow-wrap: anywhere; }
         .records th { background: #f1f5f9; font: bold 6pt "Times New Roman", Times, serif; letter-spacing: .02em; text-align: left; text-transform: uppercase; }
         .empty { padding: 3mm !important; color: #475569; font-style: italic; text-align: center; }
+        .note { margin: 2mm 0 0; font-size: 8pt; color: #475569; font-style: italic; }
         .declaration { padding: 1.5mm 2mm; border: .6pt solid #64748b; border-top: 0; }
         .signatures td { height: 20mm; padding: 1.5mm 2mm; border: .6pt solid #64748b; vertical-align: top; font-weight: bold; text-transform: uppercase; }
         .line { margin-top: 11mm; padding-top: 1mm; border-top: .6pt solid #111827; color: #475569; font-size: 5.7pt; font-weight: normal; text-align: center; text-transform: none; }
@@ -129,6 +130,20 @@
             @endforelse
             </tbody>
         </table>
+        @if($incident->web_events_count > $incident->webEvents->count())
+            {{-- An extract must announce itself: a reader signing Part VI has to
+                 know the record continues beyond what is printed here. --}}
+            <p class="note">
+                Extract: the {{ $incident->webEvents->count() }} most recent of
+                {{ number_format($incident->web_events_count) }} recorded events are shown.
+                The complete record is retained in SAFERNET and available on request.
+            </p>
+        @elseif($incident->webEvents->count() > 0)
+            <p class="note">
+                Complete: all {{ number_format($incident->web_events_count) }} recorded events for this
+                incident are shown.
+            </p>
+        @endif
     </section>
 
     <section class="section">
