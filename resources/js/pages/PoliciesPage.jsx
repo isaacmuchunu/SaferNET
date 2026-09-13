@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import clsx from 'clsx';
 import { LockIcon, PencilIcon, PlusIcon, SlidersHorizontalIcon, Trash2Icon } from 'lucide-react';
 import { PageHeader } from '../components/PageHeader';
 import {
