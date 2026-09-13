@@ -27,18 +27,57 @@ public sealed record FilterPolicy(
     };
 }
 
-public sealed class PolicyStore(IOptions<AgentOptions> options)
+public sealed class PolicyStore(IOptions<AgentOptions> options, ILogger<PolicyStore> logger)
 {
     private readonly string _path = Path.Combine(options.Value.DataDirectory, "policy.json");
     private volatile FilterPolicy _current = FilterPolicy.Empty;
     public FilterPolicy Current => _current;
 
+    /// <summary>
+    /// Loads the cached policy, if there is a readable one.
+    /// </summary>
+    /// <remarks>
+    /// An unreadable cache must never stop the agent starting. This runs before
+    /// anything else in the worker, so throwing here would fail the service,
+    /// Windows recovery would restart it, it would read the same broken file,
+    /// and the machine would sit in a restart loop filtering nothing — with the
+    /// cause buried in the event log. Discarding the file and starting empty
+    /// costs one policy fetch and keeps the agent alive to make it.
+    /// </remarks>
     public async Task LoadAsync(CancellationToken cancellationToken)
     {
         if (!File.Exists(_path)) return;
-        await using var stream = File.OpenRead(_path);
-        var policy = await JsonSerializer.DeserializeAsync<FilterPolicy>(stream, cancellationToken: cancellationToken);
-        _current = policy?.Normalised() ?? FilterPolicy.Empty;
+
+        try
+        {
+            await using var stream = File.OpenRead(_path);
+            var policy = await JsonSerializer.DeserializeAsync<FilterPolicy>(stream, cancellationToken: cancellationToken);
+            _current = policy?.Normalised() ?? FilterPolicy.Empty;
+        }
+        catch (Exception exception) when (exception is JsonException or IOException or UnauthorizedAccessException)
+        {
+            logger.LogError(exception, "The cached policy at {Path} is unreadable and has been discarded; the next cycle will fetch a fresh one", _path);
+
+            _current = FilterPolicy.Empty;
+            Discard();
+        }
+    }
+
+    /// <summary>
+    /// Removes a cache that could not be read, so the agent does not log the
+    /// same failure on every restart. Failing to delete it is not fatal — the
+    /// policy in memory is already empty.
+    /// </summary>
+    private void Discard()
+    {
+        try
+        {
+            File.Delete(_path);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            logger.LogWarning(exception, "Could not remove the unreadable policy cache at {Path}", _path);
+        }
     }
 
     public async Task ReplaceAsync(FilterPolicy policy, CancellationToken cancellationToken)

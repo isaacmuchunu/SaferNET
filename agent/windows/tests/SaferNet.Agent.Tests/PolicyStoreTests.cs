@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using SaferNet.Agent;
 using Xunit;
@@ -43,11 +44,11 @@ public sealed class PolicyStoreTests
         try
         {
             var options = Options.Create(new AgentOptions { DataDirectory = directory, ServiceToken = "test", ManagedDeviceId = 1 });
-            await new PolicyStore(options).ReplaceAsync(
+            await new PolicyStore(options, NullLogger<PolicyStore>.Instance).ReplaceAsync(
                 Policy(revision: 42, blocked: ["blocked.example"], allowed: ["ok.blocked.example"]),
                 CancellationToken.None);
 
-            var reloaded = new PolicyStore(options);
+            var reloaded = new PolicyStore(options, NullLogger<PolicyStore>.Instance);
             await reloaded.LoadAsync(CancellationToken.None);
 
             Assert.Equal(42L, reloaded.Current.Revision);
@@ -72,6 +73,85 @@ public sealed class PolicyStoreTests
         });
     }
 
+    [Fact]
+    public async Task ATruncatedCacheLoadsEmptyRatherThanStoppingTheAgent()
+    {
+        await WithCacheContaining(
+            file => File.WriteAllText(file, File.ReadAllText(file)[..12]),
+            async store =>
+            {
+                // Must not throw: LoadAsync runs before anything else in the
+                // worker, so a throw here is a service that never starts.
+                await store.LoadAsync(CancellationToken.None);
+
+                Assert.Equal(0L, store.Current.Revision);
+                Assert.False(store.IsBlocked("blocked.example"));
+            });
+    }
+
+    [Fact]
+    public async Task ACacheOfGarbageLoadsEmptyAndIsDiscarded()
+    {
+        string? cachePath = null;
+
+        await WithCacheContaining(
+            file =>
+            {
+                cachePath = file;
+                File.WriteAllBytes(file, [0x00, 0x01, 0x02, 0xff, 0xfe]);
+            },
+            async store =>
+            {
+                await store.LoadAsync(CancellationToken.None);
+
+                Assert.Equal(0L, store.Current.Revision);
+            });
+
+        // Removed, so the agent does not re-read and re-log it every restart.
+        Assert.False(File.Exists(cachePath));
+    }
+
+    [Fact]
+    public async Task AnAgentWithADiscardedCacheStillAppliesTheNextPolicy()
+    {
+        await WithCacheContaining(
+            file => File.WriteAllText(file, "{ this is not json"),
+            async store =>
+            {
+                await store.LoadAsync(CancellationToken.None);
+                await store.ReplaceAsync(Policy(revision: 9, blocked: ["blocked.example"]), CancellationToken.None);
+
+                Assert.Equal(9L, store.Current.Revision);
+                Assert.True(store.IsBlocked("blocked.example"));
+            });
+    }
+
+    /// <summary>
+    /// Writes a valid cache, lets the caller corrupt it, then hands a fresh
+    /// store over that directory — the shape of a real restart after the file
+    /// on disk went bad.
+    /// </summary>
+    private static async Task WithCacheContaining(Action<string> corrupt, Func<PolicyStore, Task> assertions)
+    {
+        var directory = TemporaryDirectory();
+
+        try
+        {
+            var options = Options.Create(new AgentOptions { DataDirectory = directory, ServiceToken = "test", ManagedDeviceId = 1 });
+            await new PolicyStore(options, NullLogger<PolicyStore>.Instance).ReplaceAsync(
+                Policy(revision: 7, blocked: ["blocked.example"]),
+                CancellationToken.None);
+
+            corrupt(Path.Combine(directory, "policy.json"));
+
+            await assertions(new PolicyStore(options, NullLogger<PolicyStore>.Instance));
+        }
+        finally
+        {
+            if (Directory.Exists(directory)) Directory.Delete(directory, true);
+        }
+    }
+
     private static FilterPolicy Policy(long revision = 1, string[]? blocked = null, string[]? allowed = null) => new(
         revision,
         (blocked ?? []).ToImmutableHashSet(StringComparer.OrdinalIgnoreCase),
@@ -85,8 +165,9 @@ public sealed class PolicyStoreTests
         var directory = TemporaryDirectory();
         try
         {
-            await assertions(new PolicyStore(Options.Create(
-                new AgentOptions { DataDirectory = directory, ServiceToken = "test", ManagedDeviceId = 1 })));
+            await assertions(new PolicyStore(
+                Options.Create(new AgentOptions { DataDirectory = directory, ServiceToken = "test", ManagedDeviceId = 1 }),
+                NullLogger<PolicyStore>.Instance));
         }
         finally
         {
