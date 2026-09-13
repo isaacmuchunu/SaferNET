@@ -471,7 +471,7 @@ export function LaboratoriesPage() {
             {/* ---------------------------------------------------------
                 DRAWERS
             --------------------------------------------------------- */}
-            <RecordDrawer
+            <LaboratoryModal
                 record={editing}
                 onClose={() => setEditing(null)}
                 title="laboratory"
@@ -491,7 +491,7 @@ export function LaboratoriesPage() {
                 ]}
             />
 
-            <RecordDrawer
+            <LaboratoryModal
                 record={editingGroup}
                 onClose={() => setEditingGroup(null)}
                 title="device group"
@@ -561,7 +561,7 @@ function MetricCard({
    SHARED CREATE / EDIT DRAWER
 ------------------------------------------------------------------ */
 
-function RecordDrawer({
+function LaboratoryModal({
     record,
     onClose,
     title,

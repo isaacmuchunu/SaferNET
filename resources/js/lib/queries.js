@@ -235,7 +235,7 @@ export const useClassroomLive = (params, options) =>
     });
 
 /**
- * A learner's browsing history. Only fetched when a drawer is actually open —
+ * A learner's browsing history. Only fetched when a panel is actually open —
  * this is sensitive data about a named child, so it is not pre-loaded for
  * every tile on the page.
  */

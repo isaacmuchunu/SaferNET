@@ -9,7 +9,7 @@ const TONES = {
 };
 
 /**
- * The single status treatment used across every table, card and drawer.
+ * The single status treatment used across every table, card and modal.
  * `descriptor` accepts the {label, tone} objects exported from lib/domain.
  */
 export function StatusPill({ descriptor, label, tone = 'neutral', className }) {

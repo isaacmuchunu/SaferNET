@@ -135,7 +135,7 @@ export function AdministratorsPage() {
                 <Pagination meta={users.data?.meta} onChange={list.setPage} unit="accounts" />
             </Panel>
 
-            <OfficerDrawer officer={editing} onClose={() => setEditing(null)} actor={user} />
+            <OfficerModal officer={editing} onClose={() => setEditing(null)} actor={user} />
 
             <ConfirmDialog
                 open={Boolean(pendingDelete)}
@@ -157,7 +157,7 @@ export function AdministratorsPage() {
 
 const EMPTY = { name: '', email: '', phone: '', avatar: null, role: 'clm', status: 'active', institution_id: '' };
 
-function OfficerDrawer({ officer, onClose, actor }) {
+function OfficerModal({ officer, onClose, actor }) {
     const save = useSaveUser();
     const [form, setForm] = useState(EMPTY);
     const isEdit = Boolean(officer?.id);

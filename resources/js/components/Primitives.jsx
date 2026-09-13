@@ -354,7 +354,7 @@ export function Cell({ align, mono, muted, bold, className, children, ...props }
     );
 }
 
-/** Label/value pair used inside drawers and detail panels. */
+/** Label/value pair used inside modals and detail panels. */
 export function DetailRow({ label, children }) {
     return (
         <div className="flex items-start justify-between gap-4 border-b border-border pb-2 last:border-0">

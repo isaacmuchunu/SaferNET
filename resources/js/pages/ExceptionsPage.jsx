@@ -111,13 +111,13 @@ export function ExceptionsPage() {
                 <Pagination meta={requests.data?.meta} onChange={list.setPage} unit="requests" />
             </Panel>
 
-            <RequestDrawer open={requesting} onClose={() => setRequesting(false)} />
-            <ReviewExceptionDrawer request={reviewing} onClose={() => setReviewing(null)} />
+            <RequestExceptionModal open={requesting} onClose={() => setRequesting(false)} />
+            <ReviewExceptionModal request={reviewing} onClose={() => setReviewing(null)} />
         </div>
     );
 }
 
-function RequestDrawer({ open, onClose }) {
+function RequestExceptionModal({ open, onClose }) {
     const create = useCreateExceptionRequest();
     const categories = useContentCategories();
     const [form, setForm] = useState({ domain: '', reason: '', content_category_id: '', expires_at: '' });
@@ -196,7 +196,7 @@ function RequestDrawer({ open, onClose }) {
     );
 }
 
-function ReviewExceptionDrawer({ request, onClose }) {
+function ReviewExceptionModal({ request, onClose }) {
     const review = useReviewExceptionRequest();
     const [decision, setDecision] = useState('approved');
     const [notes, setNotes] = useState('');

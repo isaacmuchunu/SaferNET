@@ -605,7 +605,7 @@ export function ClassroomLivePage() {
                 {historyFor && <BrowsingHistory learnerId={historyFor.learner_id} />}
             </Modal>
 
-            {/* Push Resource URL Drawer */}
+            {/* Push a lesson URL to the class */}
             <Modal
                 open={pushModalOpen}
                 onClose={() => setPushModalOpen(false)}
