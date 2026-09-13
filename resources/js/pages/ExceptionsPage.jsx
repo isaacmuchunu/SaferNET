@@ -170,7 +170,8 @@ function RequestDrawer({ open, onClose }) {
                 </>
             }
         >
-            <form id="exception-form" onSubmit={submit} className="space-y-4" noValidate>
+            {/* Two columns so the request is visible without scrolling. */}
+            <form id="exception-form" onSubmit={submit} className="grid gap-x-5 gap-y-4 sm:grid-cols-2" noValidate>
                 <Field label="Domain" required error={firstError(errors, 'domain')} hint="Without https:// — for example khanacademy.org">
                     <TextInput data-autofocus value={form.domain} onChange={set('domain')} className="font-mono" />
                 </Field>
@@ -184,7 +185,7 @@ function RequestDrawer({ open, onClose }) {
                         ))}
                     </Select>
                 </Field>
-                <Field label="Reason" required error={firstError(errors, 'reason')} hint="Explain the curriculum need this domain serves.">
+                <Field className="sm:col-span-2" label="Reason" required error={firstError(errors, 'reason')} hint="Explain the curriculum need this domain serves.">
                     <Textarea value={form.reason} maxLength={2000} onChange={set('reason')} />
                 </Field>
                 <Field label="Requested expiry" error={firstError(errors, 'expires_at')} hint="Optional. Exceptions should be time-bound.">
@@ -257,7 +258,7 @@ function ReviewExceptionDrawer({ request, onClose }) {
             }
         >
             {request && (
-                <form id="exception-review" onSubmit={submit} className="space-y-4" noValidate>
+                <form id="exception-review" onSubmit={submit} className="grid gap-x-5 gap-y-4 sm:grid-cols-2" noValidate>
                     <p className="rounded-lg bg-surface-muted px-3 py-2.5 text-xs leading-5 text-text-secondary">{request.reason}</p>
 
                     <Field label="Decision" required error={firstError(errors, 'decision')}>
@@ -273,7 +274,7 @@ function ReviewExceptionDrawer({ request, onClose }) {
                         </Field>
                     )}
 
-                    <Field label="Review notes" error={firstError(errors, 'review_notes')}>
+                    <Field className="sm:col-span-2" label="Review notes" error={firstError(errors, 'review_notes')}>
                         <Textarea value={notes} maxLength={2000} onChange={(event) => setNotes(event.target.value)} />
                     </Field>
                 </form>

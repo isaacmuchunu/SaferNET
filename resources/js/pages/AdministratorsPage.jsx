@@ -230,7 +230,8 @@ function OfficerDrawer({ officer, onClose, actor }) {
                 </>
             }
         >
-            <form id="officer-form" onSubmit={submit} className="space-y-4" noValidate>
+            {/* Two columns so the whole form is visible without scrolling. */}
+            <form id="officer-form" onSubmit={submit} className="grid gap-x-5 gap-y-4 sm:grid-cols-2" noValidate>
                 <AvatarPicker
                     officer={officer}
                     value={form.avatar}
@@ -281,7 +282,7 @@ function OfficerDrawer({ officer, onClose, actor }) {
                     </Select>
                 </Field>
                 {!isEdit && (
-                    <p className="rounded-xl border border-brand/15 bg-brand-soft/50 px-3 py-2.5 text-[11px] leading-4 text-text-secondary">
+                    <p className="rounded-xl border border-brand/15 bg-brand-soft/50 px-3 py-2.5 text-[11px] leading-4 text-text-secondary sm:col-span-2">
                         The officer will receive three separate emails and three SMS messages. Their temporary password expires automatically; first access is blocked until they set a private password and authenticator MFA.
                     </p>
                 )}
