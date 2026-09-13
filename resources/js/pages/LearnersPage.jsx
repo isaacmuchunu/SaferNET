@@ -19,7 +19,7 @@ import {
     TextInput,
     firstError,
 } from '../components/Primitives';
-import { ConfirmDialog, Drawer } from '../components/Overlays';
+import { ConfirmDialog, Modal } from '../components/Overlays';
 import { BrowsingHistory } from '../components/BrowsingHistory';
 import { StatusPill } from '../components/StatusPill';
 import { useDebouncedValue, useListState } from '../lib/hooks';
@@ -393,12 +393,12 @@ function LearnerDrawer({ learner, onClose, groups }) {
     }
 
     return (
-        <Drawer
+        <Modal
             open={Boolean(learner)}
             onClose={onClose}
             title={isEdit ? `${learner.first_name} ${learner.last_name}` : 'Enrol a learner'}
             subtitle={isEdit ? learner.learner_number : 'The learner is enrolled at your institution.'}
-            width="max-w-md"
+            size="sm"
             footer={
                 <>
                     <Button className="flex-1" onClick={onClose} disabled={save.isPending}>
@@ -456,7 +456,7 @@ function LearnerDrawer({ learner, onClose, groups }) {
                     <TextInput type="password" value={form.pin} onChange={set('pin')} maxLength={20} autoComplete="new-password" />
                 </Field>
             </form>
-        </Drawer>
+        </Modal>
     );
 }
 
@@ -497,12 +497,12 @@ function ClassDrawer({ group, onClose }) {
     }
 
     return (
-        <Drawer
+        <Modal
             open={Boolean(group)}
             onClose={onClose}
             title={isEdit ? group.name : 'Create a class'}
             subtitle="Classes group learners for filtering policy and reporting."
-            width="max-w-md"
+            size="sm"
             footer={
                 <>
                     <Button className="flex-1" onClick={onClose} disabled={save.isPending}>
@@ -527,7 +527,7 @@ function ClassDrawer({ group, onClose }) {
                     </Field>
                 </div>
             </form>
-        </Drawer>
+        </Modal>
     );
 }
 
@@ -546,7 +546,8 @@ function LearnerProfileDrawer({ learner, onClose, onEdit, canEdit }) {
     const sessions = record?.sessions ?? [];
 
     return (
-        <Drawer
+        <Modal
+            size="lg"
             open={learner !== null}
             onClose={onClose}
             title={learner ? `${learner.first_name} ${learner.last_name}` : 'Learner'}
@@ -642,7 +643,7 @@ function LearnerProfileDrawer({ learner, onClose, onEdit, canEdit }) {
                     </section>
                 </div>
             )}
-        </Drawer>
+        </Modal>
     );
 }
 

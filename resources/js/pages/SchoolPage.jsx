@@ -16,7 +16,7 @@ import {
     Skeleton,
 } from '../components/Primitives';
 import { StatusPill } from '../components/StatusPill';
-import { ReviewDrawer } from './approvals/ReviewDrawer';
+import { ReviewModal } from './approvals/ReviewModal';
 import { useAuth } from '../lib/auth';
 import { useDevices, useIncidents, useInstitution, useLaboratories, useLearners, useUsers } from '../lib/queries';
 import {
@@ -308,7 +308,7 @@ export function SchoolPage() {
                 </Panel>
             )}
 
-            <ReviewDrawer institution={reviewOpen ? record : null} onClose={() => setReviewOpen(false)} />
+            <ReviewModal institution={reviewOpen ? record : null} onClose={() => setReviewOpen(false)} />
         </div>
     );
 }

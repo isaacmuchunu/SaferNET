@@ -22,7 +22,7 @@ import {
     firstError,
 } from '../components/Primitives';
 
-import { Drawer } from '../components/Overlays';
+import { Modal } from '../components/Overlays';
 
 import { useListState } from '../lib/hooks';
 import { useAuth } from '../lib/auth';
@@ -628,7 +628,7 @@ function RecordDrawer({
     }
 
     return (
-        <Drawer
+        <Modal
             open={Boolean(record)}
             onClose={onClose}
             title={
@@ -636,7 +636,7 @@ function RecordDrawer({
                     ? record.name
                     : `Add a ${title}`
             }
-            width="max-w-md"
+            size="sm"
             footer={
                 <>
                     <Button
@@ -710,6 +710,6 @@ function RecordDrawer({
                     </Field>
                 ))}
             </form>
-        </Drawer>
+        </Modal>
     );
 }

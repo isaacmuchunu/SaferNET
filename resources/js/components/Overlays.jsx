@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useId, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import clsx from 'clsx';
 import { TriangleAlertIcon, XIcon } from 'lucide-react';
@@ -61,9 +61,32 @@ function useOverlay(open, onClose, panelRef) {
     }, [open, onClose, panelRef]);
 }
 
-/** Right-hand record panel — the portal's primary detail surface. */
-export function Drawer({ open, onClose, title, subtitle, children, footer, width = 'max-w-lg' }) {
+/**
+ * Panel widths, by how much the content actually needs.
+ *
+ * A short form and a learner's full record are not the same shape, and sizing
+ * every panel alike leaves one cramped and the other mostly empty.
+ */
+const SIZES = {
+    sm: 'sm:max-w-md',
+    md: 'sm:max-w-lg',
+    lg: 'sm:max-w-2xl',
+    xl: 'sm:max-w-4xl',
+};
+
+/**
+ * A centred modal — the portal's record and form surface.
+ *
+ * Centred rather than anchored to an edge: a panel pinned to the right pushes
+ * the record away from where the reader is looking and wastes the middle of a
+ * wide screen. On phones it becomes a bottom sheet, which is where a thumb is.
+ *
+ * The header and footer stay put while the body scrolls, so a long record never
+ * scrolls its own title out of view.
+ */
+export function Modal({ open, onClose, title, subtitle, children, footer, size = 'md' }) {
     const panelRef = useRef(null);
+    const titleId = useId();
     useOverlay(open, onClose, panelRef);
 
     if (!open) {
@@ -71,27 +94,47 @@ export function Drawer({ open, onClose, title, subtitle, children, footer, width
     }
 
     return createPortal(
-        <div className="fixed inset-0 z-80">
-            <button aria-label="Close panel" onClick={onClose} className="absolute inset-0 animate-fade-in bg-brand-deeper/35" />
+        <div className="fixed inset-0 z-80 flex items-end justify-center p-0 sm:items-center sm:p-6">
+            <button
+                aria-label="Close panel"
+                onClick={onClose}
+                className="absolute inset-0 animate-fade-in bg-brand-deeper/40 backdrop-blur-[2px]"
+            />
             <div
                 ref={panelRef}
                 role="dialog"
                 aria-modal="true"
-                aria-label={title}
+                aria-labelledby={titleId}
                 tabIndex={-1}
-                className={clsx('absolute top-0 right-0 flex h-full w-full flex-col bg-white shadow-panel outline-none animate-slide-in', width)}
+                className={clsx(
+                    'relative flex max-h-[92vh] w-full animate-scale-in flex-col overflow-hidden rounded-t-2xl bg-white shadow-panel outline-none',
+                    'sm:max-h-[85vh] sm:rounded-2xl',
+                    SIZES[size] ?? SIZES.md,
+                )}
             >
-                <div className="flex items-start justify-between gap-3 border-b border-border px-5 py-4">
+                <div className="flex shrink-0 items-start justify-between gap-3 border-b border-border px-5 py-4">
                     <div className="min-w-0">
-                        <h2 className="truncate text-base font-bold">{title}</h2>
+                        <h2 id={titleId} className="truncate text-base font-bold">
+                            {title}
+                        </h2>
                         {subtitle && <p className="mt-0.5 truncate text-xs text-text-secondary">{subtitle}</p>}
                     </div>
-                    <button onClick={onClose} aria-label="Close" className="rounded-lg p-1.5 text-text-muted hover:bg-surface-muted">
+                    <button
+                        onClick={onClose}
+                        aria-label="Close"
+                        className="rounded-lg p-1.5 text-text-muted hover:bg-surface-muted focus-visible:ring-2 focus-visible:ring-brand focus-visible:outline-none"
+                    >
                         <XIcon size={18} />
                     </button>
                 </div>
-                <div className="flex-1 overflow-y-auto px-5 py-4">{children}</div>
-                {footer && <div className="flex flex-wrap items-center gap-2 border-t border-border px-5 py-3.5">{footer}</div>}
+
+                <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">{children}</div>
+
+                {footer && (
+                    <div className="flex shrink-0 flex-wrap items-center gap-2 border-t border-border bg-white px-5 py-3.5">
+                        {footer}
+                    </div>
+                )}
             </div>
         </div>,
         document.body,

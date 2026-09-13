@@ -29,7 +29,7 @@ import {
     firstError,
 } from '../components/Primitives';
 import { Link, useSearchParams } from 'react-router-dom';
-import { ConfirmDialog, Drawer } from '../components/Overlays';
+import { ConfirmDialog, Modal } from '../components/Overlays';
 import { BrowsingHistory } from '../components/BrowsingHistory';
 import { StatusPill } from '../components/StatusPill';
 import { useDebouncedValue, useListState } from '../lib/hooks';
@@ -325,12 +325,13 @@ function DeviceFormDrawer({ device, onClose }) {
 
     return (
         <>
-            <Drawer
+            <Modal
+                size="lg"
                 open={Boolean(device)}
                 onClose={onClose}
                 title={isEdit ? device.asset_tag : 'Register a device'}
                 subtitle={isEdit ? 'Update the enrolment record for this computer.' : 'Enrol a computer before a learner uses it.'}
-                width="max-w-lg"
+                size="md"
                 footer={
                     <>
                         {isEdit && (
@@ -419,7 +420,7 @@ function DeviceFormDrawer({ device, onClose }) {
                         must also be installed before a learner uses the computer.
                     </p>
                 </form>
-            </Drawer>
+            </Modal>
 
             <ConfirmDialog
                 open={decommissioning}
@@ -516,7 +517,7 @@ function DeviceDrawer({ device, capabilities, onClose, onEdit }) {
 
     return (
         <>
-            <Drawer
+            <Modal
                 open={Boolean(device)}
                 onClose={onClose}
                 title={device?.asset_tag ?? ''}
@@ -712,7 +713,7 @@ function DeviceDrawer({ device, capabilities, onClose, onEdit }) {
                         </div>
                     </section>
                 )}
-            </Drawer>
+            </Modal>
 
             <ConfirmDialog
                 open={Boolean(pendingRemoval)}
