@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import clsx from 'clsx';
 import { GraduationCapIcon, LayersIcon, PencilIcon, PlusIcon, Trash2Icon, XIcon } from 'lucide-react';
 import { PageHeader } from '../components/PageHeader';
@@ -18,6 +19,7 @@ import {
     firstError,
 } from '../components/Primitives';
 import { ConfirmDialog, Drawer } from '../components/Overlays';
+import { BrowsingHistory } from '../components/BrowsingHistory';
 import { StatusPill } from '../components/StatusPill';
 import { useDebouncedValue, useListState } from '../lib/hooks';
 import { useAuth } from '../lib/auth';
@@ -25,14 +27,15 @@ import { useScope } from '../lib/scope';
 import {
     useDeleteLearner,
     useDeleteLearnerGroup,
+    useLearner,
     useLearnerGroups,
     useLearners,
     useSaveLearner,
     useSaveLearnerGroup,
 } from '../lib/queries';
-import { LEARNER_STATUS } from '../lib/domain';
+import { DEVICE_STATUS, LEARNER_STATUS } from '../lib/domain';
 import { capabilitiesFor } from '../lib/permissions';
-import { formatNumber } from '../lib/format';
+import { formatNumber, formatRelative } from '../lib/format';
 import { ApiError } from '../lib/api';
 import { showToast, toastError } from '../lib/toast';
 
@@ -45,6 +48,8 @@ export function LearnersPage() {
 
     const tab = list.values.tab || 'learners';
     const [editingLearner, setEditingLearner] = useState(null);
+    const [viewingLearner, setViewingLearner] = useState(null);
+    const [searchParams, setSearchParams] = useSearchParams();
     const [editingGroup, setEditingGroup] = useState(null);
     const [pendingDelete, setPendingDelete] = useState(null);
     const [pendingGroupDelete, setPendingGroupDelete] = useState(null);
@@ -65,6 +70,20 @@ export function LearnersPage() {
     const removeGroup = useDeleteLearnerGroup();
 
     const rows = learners.data?.data ?? [];
+    // A device drawer links here with ?learner=<id>; open that profile once the
+    // row is available, then drop the parameter so a refresh is not sticky.
+    const requestedLearner = searchParams.get('learner');
+    useEffect(() => {
+        if (!requestedLearner) return;
+
+        const match = rows.find((learner) => String(learner.id) === requestedLearner);
+        if (!match) return;
+
+        setViewingLearner(match);
+        searchParams.delete('learner');
+        setSearchParams(searchParams, { replace: true });
+    }, [requestedLearner, rows, searchParams, setSearchParams]);
+
     const groupRows = groups.data?.data ?? [];
 
     async function confirmDelete() {
@@ -186,7 +205,7 @@ export function LearnersPage() {
                         }
                     >
                         {rows.map((learner) => (
-                            <Row key={learner.id}>
+                            <Row key={learner.id} onClick={() => setViewingLearner(learner)}>
                                 <Cell mono>{learner.learner_number}</Cell>
                                 <Cell bold>
                                     {learner.first_name} {learner.last_name}
@@ -197,7 +216,8 @@ export function LearnersPage() {
                                     <StatusPill descriptor={LEARNER_STATUS[learner.status]} />
                                 </Cell>
                                 <Cell align="right">
-                                    <div className="flex justify-end gap-1">
+                                    {/* Stops a row click firing when an action is pressed. */}
+                                    <div className="flex justify-end gap-1" onClick={(event) => event.stopPropagation()}>
                                         {can.editLearners && (
                                             <Button size="sm" variant="ghost" icon={PencilIcon} onClick={() => setEditingLearner(learner)}>
                                                 Edit
@@ -278,6 +298,15 @@ export function LearnersPage() {
                 </Panel>
             )}
 
+            <LearnerProfileDrawer
+                learner={viewingLearner}
+                onClose={() => setViewingLearner(null)}
+                onEdit={(learner) => {
+                    setViewingLearner(null);
+                    setEditingLearner(learner);
+                }}
+                canEdit={can.editLearners}
+            />
             <LearnerDrawer learner={editingLearner} onClose={() => setEditingLearner(null)} groups={groupRows} />
             <ClassDrawer group={editingGroup} onClose={() => setEditingGroup(null)} />
 
@@ -500,3 +529,132 @@ function ClassDrawer({ group, onClose }) {
         </Drawer>
     );
 }
+
+/**
+ * Everything known about one learner, in the order a safeguarding conversation
+ * needs it: who they are, what they have been using, then what they did.
+ *
+ * The browsing history is fetched separately and filtered on the server, so
+ * opening a profile never pulls thousands of events to render a header.
+ */
+function LearnerProfileDrawer({ learner, onClose, onEdit, canEdit }) {
+    const detail = useLearner(learner?.id);
+    const record = detail.data ?? learner;
+    const activity = record?.activity;
+    const devices = record?.assignments ?? [];
+    const sessions = record?.sessions ?? [];
+
+    return (
+        <Drawer
+            open={learner !== null}
+            onClose={onClose}
+            title={learner ? `${learner.first_name} ${learner.last_name}` : 'Learner'}
+            subtitle={learner ? `${learner.learner_number}${record?.learner_group?.name ? ` · ${record.learner_group.name}` : ''}` : undefined}
+        >
+            {learner && (
+                <div className="space-y-5">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <StatusPill descriptor={LEARNER_STATUS[record?.status ?? learner.status]} />
+                        {canEdit && (
+                            <Button size="sm" variant="secondary" icon={PencilIcon} onClick={() => onEdit(learner)}>
+                                Edit details
+                            </Button>
+                        )}
+                    </div>
+
+                    {/* What this learner's record amounts to, before the detail. */}
+                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                        <Stat label="Pages recorded" value={activity ? formatNumber(activity.events) : null} />
+                        <Stat
+                            label="Blocked"
+                            value={activity ? formatNumber(activity.blocked) : null}
+                            tone={activity?.blocked > 0 ? 'text-danger' : undefined}
+                        />
+                        <Stat
+                            label="Open incidents"
+                            value={activity ? formatNumber(activity.open_incidents) : null}
+                            tone={activity?.open_incidents > 0 ? 'text-danger' : undefined}
+                        />
+                        <Stat label="Last seen" value={activity?.last_seen_at ? formatRelative(activity.last_seen_at) : 'Never'} />
+                    </div>
+
+                    <section>
+                        <h3 className="text-xs font-semibold text-text-secondary">Attributed devices</h3>
+                        {detail.isPending ? (
+                            <Skeleton className="mt-2 h-14 w-full rounded-lg" />
+                        ) : devices.length === 0 ? (
+                            <p className="mt-2 rounded-lg border border-border bg-surface-muted px-3 py-2.5 text-[11px] text-text-secondary">
+                                No device is currently attributed to this learner, so their browsing cannot be
+                                attributed either.
+                            </p>
+                        ) : (
+                            <ul className="mt-2 divide-y divide-border rounded-lg border border-border">
+                                {devices.map((assignment) => (
+                                    <li key={assignment.id} className="flex items-center justify-between gap-3 p-2.5">
+                                        <div className="min-w-0">
+                                            <p className="truncate font-mono text-xs font-semibold">
+                                                {assignment.device?.asset_tag ?? 'Unknown device'}
+                                            </p>
+                                            <p className="mt-0.5 truncate text-[11px] text-text-secondary">
+                                                {assignment.device?.hostname ?? 'No hostname'}
+                                                {assignment.device?.laboratory?.name ? ` · ${assignment.device.laboratory.name}` : ''}
+                                            </p>
+                                        </div>
+                                        <div className="shrink-0 text-right">
+                                            <StatusPill descriptor={DEVICE_STATUS[assignment.device?.status]} />
+                                            <p className="mt-1 text-[10px] text-text-muted">
+                                                {assignment.device?.last_seen_at
+                                                    ? `Seen ${formatRelative(assignment.device.last_seen_at)}`
+                                                    : 'Never seen'}
+                                            </p>
+                                        </div>
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                    </section>
+
+                    {sessions.length > 0 && (
+                        <section>
+                            <h3 className="text-xs font-semibold text-text-secondary">Recent sessions</h3>
+                            <ul className="mt-2 divide-y divide-border rounded-lg border border-border">
+                                {sessions.map((session) => (
+                                    <li key={session.id} className="flex items-center justify-between gap-3 p-2.5 text-[11px]">
+                                        <span className="truncate text-text-secondary">
+                                            {session.device?.asset_tag ?? 'Unknown device'}
+                                        </span>
+                                        <span className="shrink-0 text-text-muted">
+                                            {formatRelative(session.started_at)}
+                                            {session.ended_at ? ' — ended' : ' — open'}
+                                        </span>
+                                    </li>
+                                ))}
+                            </ul>
+                        </section>
+                    )}
+
+                    <section>
+                        <h3 className="text-xs font-semibold text-text-secondary">Browsing history</h3>
+                        <div className="mt-2">
+                            <BrowsingHistory learnerId={learner.id} />
+                        </div>
+                    </section>
+                </div>
+            )}
+        </Drawer>
+    );
+}
+
+function Stat({ label, value, tone }) {
+    return (
+        <div className="rounded-lg border border-border bg-surface-muted/50 px-3 py-2">
+            <p className="text-[10px] text-text-muted">{label}</p>
+            {value === null || value === undefined ? (
+                <Skeleton className="mt-1 h-4 w-10" />
+            ) : (
+                <p className={`mt-0.5 text-sm font-bold tabular-nums ${tone ?? 'text-text'}`}>{value}</p>
+            )}
+        </div>
+    );
+}
+

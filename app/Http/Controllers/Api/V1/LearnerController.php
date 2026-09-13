@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Enums\EnforcementAction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\SaveLearnerRequest;
 use App\Http\Resources\DomainResource;
@@ -47,11 +48,42 @@ class LearnerController extends Controller
         return new DomainResource(Learner::create($data)->load('learnerGroup:id,name'));
     }
 
+    /**
+     * One learner, with enough context to answer for them.
+     *
+     * A safeguarding conversation starts from a name and needs the devices they
+     * use, the sessions they have opened and how much has been blocked. The
+     * browsing itself is deliberately not included here — it is paginated and
+     * filterable on its own endpoint, because a learner can have thousands of
+     * events and loading them to render a profile header would be wrong.
+     */
     public function show(Learner $learner): DomainResource
     {
         Gate::authorize('view', $learner);
 
-        return new DomainResource($learner->load('learnerGroup:id,name'));
+        $learner->load([
+            'learnerGroup:id,name',
+            'institution:id,name,nemis_code',
+            // Devices currently attributed to this learner, most recent first.
+            'assignments' => fn ($assignments) => $assignments
+                ->whereNull('removed_at')
+                ->with('device:id,public_id,asset_tag,hostname,platform,status,laboratory_id,last_seen_at')
+                ->latest('assigned_at'),
+            'assignments.device.laboratory:id,name',
+            'sessions' => fn ($sessions) => $sessions
+                ->with('device:id,asset_tag,hostname')
+                ->latest('started_at')
+                ->limit(5),
+        ]);
+
+        $learner->setAttribute('activity', [
+            'events' => $learner->webEvents()->count(),
+            'blocked' => $learner->webEvents()->where('action', EnforcementAction::Block->value)->count(),
+            'open_incidents' => $learner->incidents()->whereIn('status', ['open', 'under_review'])->count(),
+            'last_seen_at' => $learner->webEvents()->max('occurred_at'),
+        ]);
+
+        return new DomainResource($learner);
     }
 
     public function update(SaveLearnerRequest $request, Learner $learner): DomainResource

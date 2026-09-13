@@ -4,6 +4,7 @@ namespace Tests\Feature\Api\V1;
 
 use App\Models\ContentCategory;
 use App\Models\Device;
+use App\Models\DeviceLearnerAssignment;
 use App\Models\Institution;
 use App\Models\Laboratory;
 use App\Models\Learner;
@@ -148,6 +149,49 @@ class LearnerBrowsingHistoryTest extends TestCase
         Sanctum::actingAs($officer, ['portal:access']);
         $tile = $this->getJson(route('api.v1.classrooms.live'))->assertOk()->json('data.tiles.0');
         $this->assertTrue($tile['is_reporting']);
+    }
+
+    public function test_a_learner_profile_carries_their_devices_and_activity(): void
+    {
+        [$officer, $session] = $this->lesson();
+        $category = ContentCategory::factory()->create();
+
+        DeviceLearnerAssignment::create([
+            'institution_id' => $session->institution_id,
+            'device_id' => $session->device_id,
+            'learner_id' => $session->learner_id,
+            'assigned_by' => $officer->id,
+            'assigned_at' => now()->subDay(),
+        ]);
+
+        $this->event($session, $category, 'allow', 'wikipedia.org', now()->subMinutes(9));
+        $this->event($session, $category, 'block', 'bet-example.co.ke', now()->subMinutes(3));
+
+        Sanctum::actingAs($officer, ['portal:access']);
+
+        $profile = $this->getJson(route('api.v1.learners.show', $session->learner_id))->assertOk();
+
+        // The device a learner uses is the thing that makes their browsing
+        // attributable, so a profile has to name it.
+        $this->assertSame($session->device_id, $profile->json('data.assignments.0.device.id'));
+        $this->assertSame(2, $profile->json('data.activity.events'));
+        $this->assertSame(1, $profile->json('data.activity.blocked'));
+        $this->assertNotNull($profile->json('data.activity.last_seen_at'));
+        $this->assertNotEmpty($profile->json('data.sessions'));
+
+        // The browsing itself is not inlined: it is paginated and filtered on
+        // its own endpoint, so a profile never loads thousands of rows.
+        $this->assertNull($profile->json('data.web_events'));
+    }
+
+    public function test_a_learner_profile_from_another_school_is_refused(): void
+    {
+        [$officer] = $this->lesson();
+        [, $foreignSession] = $this->lesson();
+
+        Sanctum::actingAs($officer, ['portal:access']);
+
+        $this->getJson(route('api.v1.learners.show', $foreignSession->learner_id))->assertNotFound();
     }
 
     /** @return array{User, LearnerSession} */

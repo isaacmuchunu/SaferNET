@@ -38,6 +38,16 @@ class Learner extends Model
         return $this->hasMany(LearnerSession::class);
     }
 
+    public function webEvents(): HasMany
+    {
+        return $this->hasMany(WebEvent::class);
+    }
+
+    public function incidents(): HasMany
+    {
+        return $this->hasMany(Incident::class);
+    }
+
     public function getFullNameAttribute(): string
     {
         return trim($this->first_name.' '.$this->last_name);
