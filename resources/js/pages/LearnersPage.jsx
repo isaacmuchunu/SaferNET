@@ -410,18 +410,12 @@ function LearnerDrawer({ learner, onClose, groups }) {
                 </>
             }
         >
-            <form id="learner-form" onSubmit={submit} className="space-y-4" noValidate>
+            {/* Two columns so the whole record is on screen at once: a field
+                you have to scroll to find is a field that gets skipped. */}
+            <form id="learner-form" onSubmit={submit} className="grid gap-x-5 gap-y-4 sm:grid-cols-2" noValidate>
                 <Field label="Learner number" required hint="The identifier used on the school register." error={firstError(errors, 'learner_number')}>
                     <TextInput data-autofocus value={form.learner_number} onChange={set('learner_number')} className="font-mono" />
                 </Field>
-                <div className="grid gap-4 sm:grid-cols-2">
-                    <Field label="First name" required error={firstError(errors, 'first_name')}>
-                        <TextInput value={form.first_name} onChange={set('first_name')} />
-                    </Field>
-                    <Field label="Last name" required error={firstError(errors, 'last_name')}>
-                        <TextInput value={form.last_name} onChange={set('last_name')} />
-                    </Field>
-                </div>
                 <Field label="Class" error={firstError(errors, 'learner_group_id')}>
                     <Select value={form.learner_group_id} onChange={set('learner_group_id')}>
                         <option value="">Unassigned</option>
@@ -431,6 +425,12 @@ function LearnerDrawer({ learner, onClose, groups }) {
                             </option>
                         ))}
                     </Select>
+                </Field>
+                <Field label="First name" required error={firstError(errors, 'first_name')}>
+                    <TextInput value={form.first_name} onChange={set('first_name')} />
+                </Field>
+                <Field label="Last name" required error={firstError(errors, 'last_name')}>
+                    <TextInput value={form.last_name} onChange={set('last_name')} />
                 </Field>
                 <Field label="Status" error={firstError(errors, 'status')}>
                     <Select value={form.status} onChange={set('status')}>
@@ -442,19 +442,21 @@ function LearnerDrawer({ learner, onClose, groups }) {
                     </Select>
                 </Field>
                 <Field
-                    label="External identity"
-                    hint="Optional. A Google Workspace or Microsoft account used to sign in."
-                    error={firstError(errors, 'external_identity')}
-                >
-                    <TextInput value={form.external_identity} onChange={set('external_identity')} />
-                </Field>
-                <Field
                     label="School PIN"
                     hint={isEdit ? 'Leave blank to keep the current PIN.' : 'Used by the learner to authenticate a session.'}
                     error={firstError(errors, 'pin')}
                 >
                     <TextInput type="password" value={form.pin} onChange={set('pin')} maxLength={20} autoComplete="new-password" />
                 </Field>
+                <div className="sm:col-span-2">
+                    <Field
+                        label="External identity"
+                        hint="Optional. A Google Workspace or Microsoft account used to sign in."
+                        error={firstError(errors, 'external_identity')}
+                    >
+                        <TextInput value={form.external_identity} onChange={set('external_identity')} />
+                    </Field>
+                </div>
             </form>
         </Modal>
     );
@@ -547,7 +549,7 @@ function LearnerProfileDrawer({ learner, onClose, onEdit, canEdit }) {
 
     return (
         <Modal
-            size="lg"
+            size="xl"
             open={learner !== null}
             onClose={onClose}
             title={learner ? `${learner.first_name} ${learner.last_name}` : 'Learner'}

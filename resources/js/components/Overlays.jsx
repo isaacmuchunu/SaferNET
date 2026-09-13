@@ -65,13 +65,16 @@ function useOverlay(open, onClose, panelRef) {
  * Panel widths, by how much the content actually needs.
  *
  * A short form and a learner's full record are not the same shape, and sizing
- * every panel alike leaves one cramped and the other mostly empty.
+ * every panel alike leaves one cramped and the other mostly empty. Sized so a
+ * form can lay its fields out in two columns and be read without scrolling,
+ * which is the point: a field you have to scroll to find is a field that gets
+ * skipped.
  */
 const SIZES = {
-    sm: 'sm:max-w-md',
-    md: 'sm:max-w-lg',
-    lg: 'sm:max-w-2xl',
-    xl: 'sm:max-w-4xl',
+    sm: 'sm:max-w-lg',
+    md: 'sm:max-w-2xl',
+    lg: 'sm:max-w-4xl',
+    xl: 'sm:max-w-6xl',
 };
 
 /**
@@ -108,7 +111,7 @@ export function Modal({ open, onClose, title, subtitle, children, footer, size =
                 tabIndex={-1}
                 className={clsx(
                     'relative flex max-h-[92vh] w-full animate-scale-in flex-col overflow-hidden rounded-t-2xl bg-white shadow-panel outline-none',
-                    'sm:max-h-[85vh] sm:rounded-2xl',
+                    'sm:max-h-[90vh] sm:rounded-2xl',
                     SIZES[size] ?? SIZES.md,
                 )}
             >
