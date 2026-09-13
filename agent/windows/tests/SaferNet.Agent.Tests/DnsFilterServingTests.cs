@@ -241,7 +241,7 @@ public sealed class DnsFilterServingTests
             MaxConcurrentQueries = 8,
         });
 
-        var policies = new PolicyStore(options);
+        var policies = new PolicyStore(options, NullLogger<PolicyStore>.Instance);
         policies.ReplaceAsync(
             new FilterPolicy(1, ImmutableHashSet.Create(StringComparer.OrdinalIgnoreCase, blocked),
                 ImmutableHashSet<string>.Empty.WithComparer(StringComparer.OrdinalIgnoreCase), DateTimeOffset.UtcNow),
