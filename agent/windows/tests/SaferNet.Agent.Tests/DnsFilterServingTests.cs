@@ -168,24 +168,57 @@ public sealed class DnsFilterServingTests
         });
     }
 
-    /// <summary>Runs the filter on an ephemeral port for the duration of one test.</summary>
+    /// <summary>
+    /// Runs the filter on an ephemeral port for the duration of one test.
+    ///
+    /// FreePort can only report a port that was free a moment ago — it has to
+    /// release it before the filter can bind it, and anything on the machine may
+    /// take it in between. A collision here says nothing about the code under
+    /// test, so it is retried on a fresh port rather than failing the run.
+    /// </summary>
     private static async Task Serving(string blocked, Func<int, DnsFilter, Task> assertions, string upstream = "1.1.1.1")
     {
-        var port = FreePort();
-        var filter = Filter(port, upstream, blocked);
-        using var cancellation = new CancellationTokenSource();
+        for (var attempt = 1; ; attempt++)
+        {
+            var port = FreePort();
+            var filter = Filter(port, upstream, blocked);
+            using var cancellation = new CancellationTokenSource();
+            var run = filter.RunAsync(cancellation.Token);
 
-        var run = filter.RunAsync(cancellation.Token);
-        await filter.Ready;
+            try
+            {
+                await filter.Ready;
+            }
+            catch (SocketException exception) when (exception.SocketErrorCode == SocketError.AddressAlreadyInUse && attempt < 5)
+            {
+                await ObserveAsync(run);
 
+                continue;
+            }
+
+            try
+            {
+                await assertions(port, filter);
+            }
+            finally
+            {
+                await cancellation.CancelAsync();
+                await run;
+            }
+
+            return;
+        }
+    }
+
+    /// <summary>Consumes a discarded run's fault so it is never unobserved.</summary>
+    private static async Task ObserveAsync(Task run)
+    {
         try
         {
-            await assertions(port, filter);
-        }
-        finally
-        {
-            await cancellation.CancelAsync();
             await run;
+        }
+        catch
+        {
         }
     }
 
@@ -221,11 +254,32 @@ public sealed class DnsFilterServingTests
         return new DnsFilter(policies, api, options, NullLogger<DnsFilter>.Instance);
     }
 
+    /// <summary>
+    /// A port free for both UDP and TCP.
+    ///
+    /// The two have separate port namespaces, so a UDP-only probe regularly
+    /// returns a port already held by some TCP socket on the machine — which
+    /// left the filter serving UDP alone and the TCP tests refusing connections.
+    /// </summary>
     private static int FreePort()
     {
-        using var probe = new UdpClient(new IPEndPoint(IPAddress.Loopback, 0));
+        for (var attempt = 0; ; attempt++)
+        {
+            using var probe = new UdpClient(new IPEndPoint(IPAddress.Loopback, 0));
+            var port = ((IPEndPoint)probe.Client.LocalEndPoint!).Port;
 
-        return ((IPEndPoint)probe.Client.LocalEndPoint!).Port;
+            try
+            {
+                var reserved = new TcpListener(new IPEndPoint(IPAddress.Loopback, port));
+                reserved.Start();
+                reserved.Stop();
+
+                return port;
+            }
+            catch (SocketException) when (attempt < 20)
+            {
+            }
+        }
     }
 
     private static async Task<byte[]> AskOverUdpAsync(int port, string name, TimeSpan? timeout = null)

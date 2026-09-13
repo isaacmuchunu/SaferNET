@@ -127,17 +127,22 @@ public sealed class DnsFilter(PolicyStore policies, SaferNetApiClient api, IOpti
     }
 
     /// <summary>
-    /// Binds every loopback transport. IPv4 UDP is mandatory: without it the
-    /// host has no resolver at all. The rest are best effort, because a host
-    /// with IPv6 disabled is a supported configuration — but each one that
-    /// fails is logged and absent from <see cref="BoundEndpoints"/> rather than
-    /// quietly assumed.
+    /// Binds every loopback transport.
+    ///
+    /// IPv4 UDP and IPv4 TCP are both mandatory. UDP alone is not a working
+    /// resolver: a stub that receives a truncated answer retries the same
+    /// question over TCP, and one that cannot be answered there simply stops
+    /// resolving those names. Failing the bind surfaces that as a dead resolver
+    /// rather than a quietly half-working one.
+    ///
+    /// IPv6 is best effort, because a host with IPv6 disabled is a supported
+    /// configuration — but a failed bind is logged and absent from
+    /// <see cref="BoundEndpoints"/> rather than assumed.
     /// </summary>
     private void Bind(List<UdpClient> udp, List<TcpListener> tcp)
     {
         udp.Add(new UdpClient(new IPEndPoint(IPAddress.Loopback, _options.DnsPort)));
-
-        TryBind(() => tcp.Add(Listen(IPAddress.Loopback)), "tcp/127.0.0.1");
+        tcp.Add(Listen(IPAddress.Loopback));
 
         if (_options.ListenOnIpv6 && Socket.OSSupportsIPv6)
         {
