@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Restricted Content - SaferNET Shield</title>
+  <link rel="stylesheet" href="blocked.css">
+</head>
+<body>
+  <div class="card">
+    <div class="header">
+      <div class="shield-badge">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      </div>
+      <div>
+        <h1>Website Restricted</h1>
+        <p class="subtitle">Kiambu County K-12 Internet Safety & Safeguarding Policy</p>
+      </div>
+    </div>
+
+    <div class="content">
+      <div class="info-group">
+        <div class="label">Requested Destination</div>
+        <div class="value" id="blocked-url">Loading...</div>
+      </div>
+
+      <div class="grid-2">
+        <div class="info-group">
+          <div class="label">Policy Category</div>
+          <div class="value" id="blocked-category">Restricted Material</div>
+        </div>
+        <div class="info-group">
+          <div class="label">Enforcement Rule</div>
+          <div class="value" id="blocked-rule">County Blocklist</div>
+        </div>
+      </div>
+
+      <div class="explanation">
+        Access to this website is restricted in accordance with the school's digital safeguarding guidelines. If you believe this site is necessary for classroom curriculum or learning research, you may submit an access request below.
+      </div>
+
+      <div class="request-box" id="request-section">
+        <h3>Need this site for class?</h3>
+        <textarea id="request-reason" placeholder="Explain how this site supports your learning or lesson assignment..."></textarea>
+        <div class="button-group">
+          <button id="submit-btn" class="btn btn-primary">Submit Exception Request</button>
+          <button id="back-btn" class="btn btn-secondary">Go Back</button>
+        </div>
+        <div id="request-status" class="status-msg"></div>
+      </div>
+    </div>
+
+    <div class="footer">
+      <span id="school-name">Kiambu County Schools</span> • SaferNET Protective Shield v2.5
+    </div>
+  </div>
+
+  <script src="blocked.js"></script>
+</body>
+</html>

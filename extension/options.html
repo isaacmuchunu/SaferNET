@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>SaferNET Shield Settings</title>
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <img src="icons/icon-48.png" alt="SaferNET" width="36" height="36">
+      <div>
+        <h2>SaferNET Workstation Enrollment</h2>
+        <p>Endpoint configuration and policy synchronization</p>
+      </div>
+    </div>
+
+    <form id="settings-form">
+      <div class="form-group">
+        <label for="apiBaseUrl">SaferNET Platform API URL</label>
+        <input type="url" id="apiBaseUrl" placeholder="http://127.0.0.1:8000/api/v1" required>
+        <div class="hint">The regional server gateway or county platform URL.</div>
+      </div>
+
+      <div class="grid-2">
+        <div class="form-group">
+          <label for="workstationId">Workstation / Terminal Tag</label>
+          <input type="text" id="workstationId" placeholder="e.g. LAB1-WS03" required>
+        </div>
+        <div class="form-group">
+          <label for="deviceId">SaferNET Device ID</label>
+          <input type="number" id="deviceId" min="1" placeholder="e.g. 42">
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="form-group">
+          <label for="laboratoryId">Laboratory ID</label>
+          <input type="number" id="laboratoryId" min="1" placeholder="e.g. 3">
+        </div>
+        <div class="form-group">
+          <label for="learnerSessionId">Active Learner Session ID</label>
+          <input type="number" id="learnerSessionId" min="1" placeholder="Set by the workstation sign-in flow">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="token">Device / Service Authorization Token</label>
+        <input type="password" id="token" placeholder="Institution-bound service token" required>
+        <div class="hint">The token determines the school. A NEMIS code cannot override its tenant boundary.</div>
+      </div>
+
+      <div class="form-actions">
+        <button type="submit" class="btn btn-primary">Save Configuration</button>
+        <button type="button" id="sync-btn" class="btn btn-secondary">Force Policy Sync Now</button>
+      </div>
+
+      <div id="status-msg" class="status-msg"></div>
+    </form>
+  </div>
+
+  <script src="options.js"></script>
+</body>
+</html>

@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>SaferNET Shield</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="popup">
+    <div class="header">
+      <img src="icons/icon-32.png" alt="SaferNET" width="24" height="24">
+      <div class="header-text">
+        <h3>SaferNET Shield</h3>
+        <span class="status-indicator">
+          <span class="dot"></span> Active Protection
+        </span>
+      </div>
+    </div>
+
+    <div class="body">
+      <div class="metric-row">
+        <span class="label">School:</span>
+        <span class="val" id="school-name">Kiambu County</span>
+      </div>
+      <div class="metric-row">
+        <span class="label">Policy:</span>
+        <span class="val" id="policy-name">Standard Policy</span>
+      </div>
+      <div class="metric-row">
+        <span class="label">Dynamic Rules:</span>
+        <span class="val mono" id="rules-count">0</span>
+      </div>
+      <div class="metric-row">
+        <span class="label">SafeSearch:</span>
+        <span class="val text-success">Strict Enforced</span>
+      </div>
+      <div class="metric-row">
+        <span class="label">Last Synced:</span>
+        <span class="val" id="last-synced">Checking...</span>
+      </div>
+    </div>
+
+    <div class="footer">
+      <button id="sync-now-btn" class="btn btn-sm">Sync Policy</button>
+      <button id="open-settings-btn" class="btn btn-sm btn-ghost">Settings</button>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
