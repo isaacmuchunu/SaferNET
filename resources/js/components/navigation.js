@@ -15,6 +15,7 @@ import {
     SettingsIcon,
     ShieldAlertIcon,
     SlidersHorizontalIcon,
+    TelescopeIcon,
     UsersRoundIcon,
 } from 'lucide-react';
 import { capabilitiesFor } from '../lib/permissions';
@@ -54,6 +55,7 @@ export function navigationFor(user) {
                 can.viewPolicies && { label: 'Policies', path: '/policies', icon: SlidersHorizontalIcon },
                 can.viewPolicies && { label: 'Categories', path: '/categories', icon: ListChecksIcon },
                 can.viewPolicies && { label: 'Blocklists', path: '/blocklists', icon: DatabaseIcon },
+                can.reviewDomains && { label: 'Domain review', path: '/domain-reviews', icon: TelescopeIcon },
             ],
         },
         {
