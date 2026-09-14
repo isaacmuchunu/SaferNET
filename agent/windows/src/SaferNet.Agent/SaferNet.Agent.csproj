@@ -5,6 +5,20 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>SaferNet.Agent</AssemblyName>
     <RootNamespace>SaferNet.Agent</RootNamespace>
+
+    <!--
+      The service runs unattended, so the only places anyone sees it are the
+      Services console, Task Manager and the file itself. Without an icon and
+      version metadata it appears there as an anonymous executable named
+      SaferNet.Agent, which is exactly what an administrator should be
+      suspicious of on a machine they did not set up.
+    -->
+    <ApplicationIcon>safernet.ico</ApplicationIcon>
+    <Product>SAFERNET Endpoint Agent</Product>
+    <AssemblyTitle>SAFERNET Endpoint Agent</AssemblyTitle>
+    <Company>Kiambu County Directorate of Education</Company>
+    <Description>DNS filtering and policy enforcement for Kiambu County school workstations.</Description>
+    <Copyright>Kiambu County Directorate of Education</Copyright>
   </PropertyGroup>
   <ItemGroup>
     <!-- Packet parsing is internal, but it is the part most worth testing directly. -->
