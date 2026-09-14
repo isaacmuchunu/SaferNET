@@ -42,6 +42,7 @@ const BASE = {
     // Filtering
     viewPolicies: false,
     managePolicies: false,
+    reviewDomains: false,
 
     // Safety
     viewIncidents: false,
@@ -80,6 +81,7 @@ const ROLE_CAPABILITIES = {
         manageLaboratories: true,
         viewPolicies: true,
         managePolicies: true,
+        reviewDomains: true,
         viewIncidents: true,
         recordIncidentActions: true,
         submitExceptions: true,
@@ -101,6 +103,7 @@ const ROLE_CAPABILITIES = {
         viewDevices: true,
         viewLaboratories: true,
         viewPolicies: true,
+        reviewDomains: true,
         viewIncidents: true,
         submitExceptions: true,
         reviewExceptions: true,

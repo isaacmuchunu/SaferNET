@@ -22,3 +22,11 @@ Schedule::command('safernet:expire-stale-components')
     ->everyFifteenMinutes()
     ->withoutOverlapping()
     ->onOneServer();
+
+// Blocklists only know what was published before a site existed. This is how
+// real learner traffic closes that gap: unknown domains are classified once and
+// queued for a director to decide.
+Schedule::command('safernet:triage-domains')
+    ->dailyAt('03:30')
+    ->withoutOverlapping()
+    ->onOneServer();

@@ -261,6 +261,9 @@ export const api = {
     contentCategories: (query, signal) => request('/content-categories', { query, signal }),
     auditLogs: (query, signal) => request('/audit-logs', { query, signal }),
 
+    domainReviews: (query, signal) => request('/domain-reviews', { query, signal }),
+    decideDomainReview: (id, body) => request(`/domain-reviews/${id}`, { method: 'PUT', body }),
+
     blocklistSources: (query, signal) => request('/blocklist-sources', { query, signal }),
     updateBlocklistSource: (id, body) => request(`/blocklist-sources/${id}`, { method: 'PUT', body }),
     syncBlocklistSource: (id) => request(`/blocklist-sources/${id}/sync`, { method: 'POST' }),

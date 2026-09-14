@@ -27,6 +27,7 @@ import { ClassroomLivePage } from './pages/ClassroomLivePage';
 import { PoliciesPage } from './pages/PoliciesPage';
 import { CategoriesPage } from './pages/CategoriesPage';
 import { BlocklistsPage } from './pages/BlocklistsPage';
+import { DomainReviewPage } from './pages/DomainReviewPage';
 import { IncidentsPage } from './pages/IncidentsPage';
 import { IncidentPage } from './pages/IncidentPage';
 import { AlertsPage } from './pages/AlertsPage';
@@ -108,6 +109,10 @@ function Portal() {
                         <Route path="policies" element={<PoliciesPage />} />
                         <Route path="categories" element={<CategoriesPage />} />
                         <Route path="blocklists" element={<BlocklistsPage />} />
+                    </Route>
+
+                    <Route element={<RequireCapability capability="reviewDomains" />}>
+                        <Route path="domain-reviews" element={<DomainReviewPage />} />
                     </Route>
 
                     <Route element={<RequireCapability capability="viewIncidents" />}>

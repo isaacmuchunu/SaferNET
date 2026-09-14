@@ -15,6 +15,7 @@ use App\Http\Controllers\Api\V1\DashboardController;
 use App\Http\Controllers\Api\V1\DeviceAssignmentController;
 use App\Http\Controllers\Api\V1\DeviceController;
 use App\Http\Controllers\Api\V1\DeviceGroupController;
+use App\Http\Controllers\Api\V1\DomainReviewController;
 use App\Http\Controllers\Api\V1\ExceptionRequestController;
 use App\Http\Controllers\Api\V1\ExceptionRequestReviewController;
 use App\Http\Controllers\Api\V1\ExtensionController;
@@ -186,6 +187,16 @@ Route::prefix('v1')->name('api.v1.')->group(function (): void {
                 Route::get('notification-deliveries', [NotificationDeliveryController::class, 'index'])
                     ->name('notification-deliveries.index');
             });
+
+            /*
+             | Domains learners reached that no blocklist covers. A decision here
+             | is county-wide rather than a school's own, so these sit outside the
+             | institution-scoped registers entirely: a director has no
+             | institution to be scoped to. The controller admits directors only.
+             */
+            Route::get('domain-reviews', [DomainReviewController::class, 'index'])->name('domain-reviews.index');
+            Route::put('domain-reviews/{domainReview}', [DomainReviewController::class, 'update'])
+                ->name('domain-reviews.update');
 
             Route::middleware('role:cde,scde,hoi')->group(function (): void {
                 Route::apiResource('audit-logs', AuditLogController::class)->only(['index', 'show']);

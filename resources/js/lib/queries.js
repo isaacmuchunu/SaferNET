@@ -87,6 +87,19 @@ export const useToggleBlocklistSource = () =>
         'integrations',
     ]);
 
+export const useDomainReviews = (params, options) => useCollection('domain-reviews', api.domainReviews, params, options);
+
+/**
+ * A decision here is county policy, so it invalidates the blocklists and the
+ * integration summary as well as the queue itself.
+ */
+export const useDecideDomainReview = () =>
+    useInvalidatingMutation(({ id, ...body }) => api.decideDomainReview(id, body), [
+        'domain-reviews',
+        'blocklist-sources',
+        'integrations',
+    ]);
+
 export const useNotifications = (params, options) => useCollection('notifications', api.notifications, params, options);
 
 export const usePolicyRules = (policyId) =>

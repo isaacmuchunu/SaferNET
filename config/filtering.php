@@ -44,6 +44,24 @@ return [
     |
     */
 
+    /*
+    |--------------------------------------------------------------------------
+    | Domain triage
+    |--------------------------------------------------------------------------
+    |
+    | How many distinct learners must reach a domain before it is queued for
+    | review. One curious learner generates a long tail of one-off domains, and
+    | a queue containing all of them is a queue nobody reads.
+    |
+    | It is also a privacy boundary: below this threshold a queue entry would
+    | single out one child's browsing for official attention.
+    |
+    */
+
+    'triage' => [
+        'minimum_learners' => (int) env('FILTERING_TRIAGE_MINIMUM_LEARNERS', 2),
+    ],
+
     'curriculum_allowlist' => [
         'education.go.ke',
         'kicd.ac.ke',
