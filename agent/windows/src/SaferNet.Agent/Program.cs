@@ -9,6 +9,8 @@ builder.Services.AddOptions<AgentOptions>()
     .ValidateOnStart();
 builder.Services.AddSingleton<PolicyStore>();
 builder.Services.AddSingleton<DnsFilter>();
+builder.Services.AddSingleton<BlockedDomainReporter>();
+builder.Services.AddHostedService(services => services.GetRequiredService<BlockedDomainReporter>());
 builder.Services.AddHttpClient<SaferNetApiClient>((services, client) =>
 {
     var options = services.GetRequiredService<IOptions<AgentOptions>>().Value;

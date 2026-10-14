@@ -9,6 +9,17 @@ namespace SaferNet.Agent.Tests;
 public sealed class PolicyStoreTests
 {
     [Fact]
+    public async Task AnAllowedParentOutranksAnExplicitBlockedChild()
+    {
+        await WithStore(async store =>
+        {
+            await store.ReplaceAsync(Policy(blocked: ["ads.example.com"], allowed: ["example.com"]), CancellationToken.None);
+            Assert.False(store.IsBlocked("ads.example.com"));
+            Assert.False(store.IsBlocked("deep.ads.example.com"));
+        });
+    }
+
+    [Fact]
     public async Task CachedPolicyBlocksExactDomainsAndSubdomains()
     {
         await WithStore(async store =>

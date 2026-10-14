@@ -48,6 +48,9 @@ public sealed class AgentOptions
     [Range(1, 10_000)]
     public int MaxConcurrentQueries { get; init; } = 256;
 
+    [Range(1, 10_000)]
+    public int MaxQueuedBlockReports { get; init; } = 256;
+
     public int PolicyRefreshSeconds { get; init; } = 300;
 
     public int HeartbeatSeconds { get; init; } = 60;

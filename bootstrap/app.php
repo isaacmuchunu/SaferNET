@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\AuditApiMutation;
 use App\Http\Middleware\EnsureAccountIsActive;
+use App\Http\Middleware\EnsureDeviceIdentity;
 use App\Http\Middleware\EnsureInstitutionIsApproved;
 use App\Http\Middleware\EnsureRole;
 use App\Http\Middleware\ResolveTenantContext;
@@ -21,6 +22,7 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
+            'device.identity' => EnsureDeviceIdentity::class,
             'abilities' => CheckAbilities::class,
             'ability' => CheckForAnyAbility::class,
             'account.active' => EnsureAccountIsActive::class,

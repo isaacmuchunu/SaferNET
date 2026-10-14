@@ -97,6 +97,37 @@ if (Get-Service $ServiceName -ErrorAction SilentlyContinue) {
     Start-Sleep -Seconds 2
 }
 
+$browserEnrollment = Join-Path $dataDirectory 'browser-enrollment.json'
+if (Test-Path -LiteralPath $browserEnrollment) {
+    $enrollment = Get-Content -LiteralPath $browserEnrollment -Raw | ConvertFrom-Json
+    $extensionId = $enrollment.extension_id
+    if ($extensionId -cmatch '^[a-p]{32}$') {
+        $policy = "HKLM:\SOFTWARE\Policies\Google\Chrome\3rdparty\extensions\$extensionId\policy"
+        foreach ($name in @('apiBaseUrl', 'token', 'device_id', 'workstation_id')) {
+            Remove-ItemProperty -LiteralPath $policy -Name $name -ErrorAction SilentlyContinue
+        }
+        $forceList = 'HKLM:\SOFTWARE\Policies\Google\Chrome\ExtensionInstallForcelist'
+        if (Test-Path -LiteralPath $forceList) {
+            $key = Get-Item -LiteralPath $forceList
+            foreach ($name in $key.GetValueNames()) {
+                if ([string]$key.GetValue($name) -like "$extensionId;*") {
+                    Remove-ItemProperty -LiteralPath $forceList -Name $name
+                }
+            }
+        }
+        $chromePolicy = 'HKLM:\SOFTWARE\Policies\Google\Chrome'
+        $chromeKey = Get-Item -LiteralPath $chromePolicy -ErrorAction SilentlyContinue
+        $current = if ($chromeKey) { $chromeKey.GetValue('DeveloperToolsAvailability', $null) } else { $null }
+        if ($current -eq 0 -and $enrollment.PSObject.Properties.Name -contains 'had_developer_tools') {
+            if ($enrollment.had_developer_tools) {
+                New-ItemProperty -Path $chromePolicy -Name DeveloperToolsAvailability -Value $enrollment.developer_tools -PropertyType DWord -Force | Out-Null
+            } else {
+                Remove-ItemProperty -LiteralPath $chromePolicy -Name DeveloperToolsAvailability -ErrorAction SilentlyContinue
+            }
+        }
+    }
+}
+
 Remove-Item -LiteralPath (Join-Path $env:ProgramFiles 'SaferNET Agent') -Recurse -Force -ErrorAction SilentlyContinue
 
 if ($unrestored -gt 0) {

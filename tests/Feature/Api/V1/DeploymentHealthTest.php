@@ -25,7 +25,7 @@ class DeploymentHealthTest extends TestCase
     public function test_a_heartbeat_without_a_successful_sync_is_not_healthy(): void
     {
         $institution = Institution::factory()->create();
-        Sanctum::actingAs(User::factory()->service($institution)->create(), ['telemetry:write']);
+        Sanctum::actingAs(User::factory()->service($institution, Device::factory()->for($institution)->create(['asset_tag' => 'LAB-A-07']))->create(), ['telemetry:write']);
 
         $this->postJson(route('api.v1.extension.heartbeat'), [
             'workstation_id' => 'LAB-A-07',
@@ -41,7 +41,7 @@ class DeploymentHealthTest extends TestCase
     public function test_a_heartbeat_records_the_clients_own_last_successful_sync(): void
     {
         $institution = Institution::factory()->create();
-        Sanctum::actingAs(User::factory()->service($institution)->create(), ['telemetry:write']);
+        Sanctum::actingAs(User::factory()->service($institution, Device::factory()->for($institution)->create(['asset_tag' => 'LAB-A-07']))->create(), ['telemetry:write']);
 
         $syncedAt = now()->subMinutes(3);
 
@@ -61,7 +61,7 @@ class DeploymentHealthTest extends TestCase
     public function test_a_sync_that_has_aged_out_stops_counting_as_healthy(): void
     {
         $institution = Institution::factory()->create();
-        Sanctum::actingAs(User::factory()->service($institution)->create(), ['telemetry:write']);
+        Sanctum::actingAs(User::factory()->service($institution, Device::factory()->for($institution)->create(['asset_tag' => 'LAB-A-07']))->create(), ['telemetry:write']);
 
         $this->postJson(route('api.v1.extension.heartbeat'), [
             'workstation_id' => 'LAB-A-07',
@@ -162,7 +162,7 @@ class DeploymentHealthTest extends TestCase
             'started_at' => now(),
         ]);
 
-        Sanctum::actingAs(User::factory()->service($institution)->create(), ['telemetry:write']);
+        Sanctum::actingAs(User::factory()->service($institution, $device)->create(), ['telemetry:write']);
 
         $this->getJson(route('api.v1.extension.session', ['workstation_id' => 'ICTLAB-07']))
             ->assertOk()
@@ -186,8 +186,6 @@ class DeploymentHealthTest extends TestCase
         Sanctum::actingAs(User::factory()->service($institution)->create(), ['telemetry:write']);
 
         $this->getJson(route('api.v1.extension.session', ['device_id' => $foreignDevice->id]))
-            ->assertOk()
-            ->assertJsonPath('session', null)
-            ->assertJsonPath('reason', 'no_device');
+            ->assertForbidden();
     }
 }

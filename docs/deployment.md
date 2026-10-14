@@ -58,7 +58,7 @@ php artisan safernet:enroll-device <NEMIS_CODE> LAB-01-PC-01 --laboratory="Compu
 ### Step 2: Issue Scoped Service Token
 ```bash
 # Generates a long-lived bearer token restricted to device telemetry and policy sync
-php artisan safernet:issue-service-token <NEMIS_CODE> --name="agent-token-LAB-01-PC-01"
+php artisan safernet:issue-service-token <NEMIS_CODE> --device=<DEVICE_ID> --name="agent-token-LAB-01-PC-01"
 ```
 *Note: Securely store the output token string. It is hashed in the database and shown only once.*
 

@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Enums\UserRole;
+use App\Models\Device;
 use App\Models\Institution;
 use App\Models\User;
 use Illuminate\Console\Attributes\Description;
@@ -11,7 +12,7 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
-#[Signature('safernet:issue-service-token {institution : Institution NEMIS code} {--name=filtering-gateway : Token name}')]
+#[Signature('safernet:issue-service-token {institution : Institution NEMIS code} {--device= : Required managed device ID} {--name=filtering-gateway : Token name}')]
 #[Description('Create an institution-bound machine identity and issue its telemetry token')]
 class IssueServiceTokenCommand extends Command
 {
@@ -27,10 +28,20 @@ class IssueServiceTokenCommand extends Command
             return self::FAILURE;
         }
 
-        $token = DB::transaction(function () use ($institution): string {
+        $device = Device::withoutGlobalScopes()->where('institution_id', $institution->id)
+            ->whereKey((int) $this->option('device'))->first();
+
+        if ($device === null) {
+            $this->components->error('Supply --device with a managed device ID enrolled in this institution.');
+
+            return self::FAILURE;
+        }
+
+        $token = DB::transaction(function () use ($institution, $device): string {
             $identity = User::create([
                 'subcounty_id' => $institution->subcounty_id,
                 'institution_id' => $institution->id,
+                'managed_device_id' => $device->id,
                 'name' => $this->option('name').' · '.$institution->name,
                 'email' => 'service+'.Str::uuid().'@safernet.internal',
                 'password' => Str::password(64),

@@ -53,7 +53,7 @@ class WebEventTenantIntegrityTest extends TestCase
             'level' => 'institution',
         ]);
         $rule = PolicyRule::factory()->for($outsidePolicy, 'policy')->for($category, 'category')->create();
-        Sanctum::actingAs(User::factory()->service($institution)->create(), ['telemetry:write']);
+        Sanctum::actingAs(User::factory()->service($institution, $session->device)->create(), ['telemetry:write']);
 
         $this->postJson(route('api.v1.web-events.store'), $this->payload($session, [
             'policy_rule_id' => $rule->id,

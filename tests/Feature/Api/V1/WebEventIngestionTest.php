@@ -111,8 +111,8 @@ class WebEventIngestionTest extends TestCase
     private function attributedSession(): array
     {
         $institution = Institution::factory()->create();
-        $user = User::factory()->service($institution)->create();
         $device = Device::factory()->for($institution)->create();
+        $user = User::factory()->service($institution, $device)->create();
         $learner = Learner::factory()->for($institution)->create();
         $session = LearnerSession::create([
             'institution_id' => $institution->id,

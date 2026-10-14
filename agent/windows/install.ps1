@@ -44,6 +44,14 @@ $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
 $principal = [Security.Principal.WindowsPrincipal]::new($identity)
 if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) { throw 'Run this installer as Administrator.' }
 
+$apiUri = [Uri]$ApiBaseUrl
+if (($apiUri.Scheme -ne 'https' -and -not ($apiUri.Scheme -eq 'http' -and $apiUri.IsLoopback)) -or $apiUri.UserInfo -or $apiUri.Query -or $apiUri.Fragment) {
+    throw 'Use an HTTPS API URL (HTTP is supported only on loopback for development).'
+}
+if ($ForceInstallExtension -and $ExtensionId -notmatch '^[a-p]{32}$') {
+    throw 'ForceInstallExtension requires a valid 32-character Chrome extension ID.'
+}
+
 function Get-ManagedAdapter {
     <#
         Physical, DNS-carrying IPv4 adapters. Loopback and any adapter already
@@ -247,6 +255,14 @@ if (-not [int]::TryParse($ManagedDeviceId, [ref]$deviceIdInt)) {
     $deviceIdInt = [int]$ManagedDeviceId
 }
 
+$enrollment = Invoke-RestMethod -Uri "$($ApiBaseUrl.TrimEnd('/'))/extension/session" -Headers @{
+        Authorization = "Bearer $ServiceToken"; Accept = 'application/json'
+} -Method Get -TimeoutSec 15 -MaximumRedirection 0
+if ([int]$enrollment.device_id -ne $deviceIdInt) { throw 'The service token belongs to another device.' }
+
+$WorkstationId = [string]$enrollment.workstation_id
+if (-not $WorkstationId) { throw 'The enrolled workstation identifier is missing.' }
+
 # ------------------------------------------------------------------- files
 
 $installDirectory = Join-Path $env:ProgramFiles 'SaferNET Agent'
@@ -340,11 +356,55 @@ if ($ConfigureDns) {
 }
 
 if ($ForceInstallExtension) {
-    if (-not $ExtensionId) {
-        Write-Warning 'ForceInstallExtension was requested without an ExtensionId, so no browser policy was written. The extension remains removable by the learner.'
-    } else {
-        Set-ForcedExtension -Id $ExtensionId -UpdateUrl $ExtensionUpdateUrl
+    $chromePolicy = 'HKLM:\SOFTWARE\Policies\Google\Chrome'
+    $browserEnrollmentPath = Join-Path $dataDirectory 'browser-enrollment.json'
+    $previousEnrollment = if (Test-Path -LiteralPath $browserEnrollmentPath) {
+        Get-Content -LiteralPath $browserEnrollmentPath -Raw | ConvertFrom-Json
+    } else { $null }
+    $chromeKey = Get-Item -LiteralPath $chromePolicy -ErrorAction SilentlyContinue
+    $previousDeveloperTools = if ($chromeKey) { $chromeKey.GetValue('DeveloperToolsAvailability', $null) } else { $null }
+    $hadDeveloperTools = $null -ne $previousDeveloperTools
+    if ($previousEnrollment -and $previousEnrollment.PSObject.Properties.Name -contains 'had_developer_tools') {
+        $hadDeveloperTools = $previousEnrollment.had_developer_tools
+        $previousDeveloperTools = $previousEnrollment.developer_tools
     }
+    $currentDeveloperTools = if ($chromeKey) { $chromeKey.GetValue('DeveloperToolsAvailability', $null) } else { $null }
+    if ($currentDeveloperTools -ne 2) {
+        if (-not (Test-Path -LiteralPath $chromePolicy)) { New-Item -Path $chromePolicy -Force | Out-Null }
+        New-ItemProperty -Path $chromePolicy -Name DeveloperToolsAvailability -Value 0 -PropertyType DWord -Force | Out-Null
+    }
+
+    $browserPolicy = "HKLM:\SOFTWARE\Policies\Google\Chrome\3rdparty\extensions\$ExtensionId\policy"
+    if (-not (Test-Path -LiteralPath $browserPolicy)) { New-Item -Path $browserPolicy -Force | Out-Null }
+    New-ItemProperty -Path $browserPolicy -Name apiBaseUrl -Value $ApiBaseUrl.TrimEnd('/') -PropertyType String -Force | Out-Null
+    New-ItemProperty -Path $browserPolicy -Name token -Value $ServiceToken -PropertyType String -Force | Out-Null
+    New-ItemProperty -Path $browserPolicy -Name device_id -Value $deviceIdInt -PropertyType DWord -Force | Out-Null
+    New-ItemProperty -Path $browserPolicy -Name workstation_id -Value $WorkstationId -PropertyType String -Force | Out-Null
+    $policyAcl = [Security.AccessControl.RegistrySecurity]::new()
+    $policyAcl.SetAccessRuleProtection($true, $false)
+    foreach ($sid in @('S-1-5-18', 'S-1-5-32-544')) {
+        $policyAcl.AddAccessRule([Security.AccessControl.RegistryAccessRule]::new(
+            [Security.Principal.SecurityIdentifier]::new($sid),
+            [Security.AccessControl.RegistryRights]::FullControl,
+            [Security.AccessControl.AccessControlType]::Allow))
+    }
+    $policyAcl.AddAccessRule([Security.AccessControl.RegistryAccessRule]::new(
+        [Security.Principal.SecurityIdentifier]::new('S-1-5-11'),
+        [Security.AccessControl.RegistryRights]::ReadKey,
+        [Security.AccessControl.AccessControlType]::Allow))
+    Set-Acl -LiteralPath $browserPolicy -AclObject $policyAcl
+    Set-ForcedExtension -Id $ExtensionId -UpdateUrl $ExtensionUpdateUrl
+    @{ extension_id = $ExtensionId; had_developer_tools = $hadDeveloperTools; developer_tools = $previousDeveloperTools } |
+        ConvertTo-Json | Set-Content -LiteralPath $browserEnrollmentPath
+    $backupAcl = [Security.AccessControl.FileSecurity]::new()
+    $backupAcl.SetAccessRuleProtection($true, $false)
+    foreach ($sid in @('S-1-5-18', 'S-1-5-32-544')) {
+        $backupAcl.AddAccessRule([Security.AccessControl.FileSystemAccessRule]::new(
+            [Security.Principal.SecurityIdentifier]::new($sid),
+            [Security.AccessControl.FileSystemRights]::FullControl,
+            [Security.AccessControl.AccessControlType]::Allow))
+    }
+    Set-Acl -LiteralPath $browserEnrollmentPath -AclObject $backupAcl
 }
 
 Write-Host 'SAFERNET Endpoint Agent installed and running.'

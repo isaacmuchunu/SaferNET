@@ -102,7 +102,7 @@ export default [
 
     /* ------------------------------------------------------- build configs */
     {
-        files: ['*.config.js', 'vite.config.js'],
+        files: ['*.config.js', 'vite.config.js', 'tests/*.mjs'],
         languageOptions: {
             ecmaVersion: 'latest',
             sourceType: 'module',

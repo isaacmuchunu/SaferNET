@@ -92,7 +92,7 @@ public sealed class PolicyStore(IOptions<AgentOptions> options, ILogger<PolicySt
 
     /// <summary>
     /// A domain is blocked when it, or a parent of it, is on the blocklist and
-    /// nothing nearer the leaf allows it. The allowlist wins at every level, so
+    /// no matching parent allows it. Allow rules outrank every matching block, so
     /// an approved exception for lessons.example.com survives a list entry for
     /// example.com.
     /// </summary>
@@ -100,16 +100,17 @@ public sealed class PolicyStore(IOptions<AgentOptions> options, ILogger<PolicySt
     {
         var policy = _current;
         var candidate = domain.TrimEnd('.');
+        var blocked = false;
 
         while (candidate.Length > 0)
         {
             if (policy.AllowedDomains.Contains(candidate)) return false;
-            if (policy.BlockedDomains.Contains(candidate)) return true;
+            blocked |= policy.BlockedDomains.Contains(candidate);
             var separator = candidate.IndexOf('.');
             if (separator < 0) break;
             candidate = candidate[(separator + 1)..];
         }
 
-        return false;
+        return blocked;
     }
 }
