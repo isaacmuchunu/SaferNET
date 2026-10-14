@@ -70,7 +70,7 @@ Route::prefix('v1')->name('api.v1.')->group(function (): void {
          | limited to the telemetry ability and may only report for a school
          | that is operational on the platform.
          */
-        Route::middleware(['abilities:telemetry:write', 'institution.approved', 'throttle:telemetry'])
+        Route::middleware(['abilities:telemetry:write', 'institution.approved', 'device.identity', 'throttle:telemetry'])
             ->group(function (): void {
                 Route::get('extension/sync', [ExtensionController::class, 'sync'])->name('extension.sync');
                 Route::get('agent/policy', [ExtensionController::class, 'agentPolicy'])->name('agent.policy');

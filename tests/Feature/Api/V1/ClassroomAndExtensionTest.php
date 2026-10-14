@@ -168,7 +168,8 @@ class ClassroomAndExtensionTest extends TestCase
     public function test_extension_heartbeat_writes_the_real_component_schema_in_its_own_tenant(): void
     {
         $institution = Institution::factory()->create();
-        $service = User::factory()->service($institution)->create();
+        $device = Device::factory()->for($institution)->create(['asset_tag' => 'LAB-A-07']);
+        $service = User::factory()->service($institution, $device)->create();
         Sanctum::actingAs($service, ['telemetry:write']);
 
         $this->postJson(route('api.v1.extension.heartbeat'), [
@@ -208,7 +209,7 @@ class ClassroomAndExtensionTest extends TestCase
             'institution_id' => $institution->id,
             'asset_tag' => 'ICTLAB-TEST-01',
         ]);
-        $service = User::factory()->service($institution)->create();
+        $service = User::factory()->service($institution, $device)->create();
         Sanctum::actingAs($service, ['telemetry:write']);
 
         // Resolve by asset tag

@@ -3,6 +3,7 @@
 namespace Tests\Feature\Console;
 
 use App\Enums\UserRole;
+use App\Models\Device;
 use App\Models\Institution;
 use App\Models\User;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
@@ -15,16 +16,19 @@ class IssueServiceTokenCommandTest extends TestCase
     public function test_command_issues_an_institution_bound_telemetry_token(): void
     {
         $institution = Institution::factory()->create();
+        $device = Device::factory()->for($institution)->create();
 
         $this->artisan('safernet:issue-service-token', [
             'institution' => $institution->nemis_code,
             '--name' => 'lab-gateway',
+            '--device' => $device->id,
         ])->assertSuccessful();
 
         $identity = User::query()->where('role', UserRole::Service)->sole();
         $token = $identity->tokens()->sole();
 
         $this->assertSame($institution->id, $identity->institution_id);
+        $this->assertSame($device->id, $identity->managed_device_id);
         $this->assertSame($institution->subcounty_id, $identity->subcounty_id);
         $this->assertSame(['telemetry:write'], $token->abilities);
     }

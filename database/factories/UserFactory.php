@@ -3,6 +3,7 @@
 namespace Database\Factories;
 
 use App\Enums\UserRole;
+use App\Models\Device;
 use App\Models\Institution;
 use App\Models\Subcounty;
 use App\Models\User;
@@ -72,9 +73,13 @@ class UserFactory extends Factory
         return $this->forInstitution($institution, UserRole::Clm);
     }
 
-    public function service(?Institution $institution = null): static
+    public function service(?Institution $institution = null, ?Device $device = null): static
     {
-        return $this->forInstitution($institution, UserRole::Service);
+        $institution ??= Institution::factory()->create();
+
+        return $this->forInstitution($institution, UserRole::Service)->state(fn (): array => [
+            'managed_device_id' => $device?->id ?? Device::factory()->for($institution)->create()->id,
+        ]);
     }
 
     private function forInstitution(?Institution $institution, UserRole $role): static

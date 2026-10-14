@@ -1,5 +1,4 @@
-const DEFAULT_BACKEND_URL = 'http://127.0.0.1:8000/api/v1';
-const EXTENSION_VERSION = '2.7.0';
+const EXTENSION_VERSION = '2.7.1';
 const SYNC_ALARM_NAME = 'safernet_policy_sync_alarm';
 const HEARTBEAT_ALARM_NAME = 'safernet_heartbeat_alarm';
 const COMMAND_ALARM_NAME = 'safernet_classroom_command_alarm';
@@ -39,6 +38,10 @@ async function ensureAlarms() {
 }
 
 async function startUp() {
+  await chrome.storage.local.setAccessLevel({ accessLevel: 'TRUSTED_CONTEXTS' });
+  await chrome.storage.managed.setAccessLevel({ accessLevel: 'TRUSTED_CONTEXTS' });
+  await chrome.storage.local.remove(['apiBaseUrl', 'token', 'device_id', 'workstation_id', 'laboratory_id', 'learner_session_pinned']);
+  await expireFocus();
   await ensureAlarms();
   await syncPoliciesFromDatabase();
   await refreshLearnerSession();
@@ -54,6 +57,7 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
   if (alarm.name === SYNC_ALARM_NAME) await syncPoliciesFromDatabase();
   if (alarm.name === HEARTBEAT_ALARM_NAME) await sendHeartbeat();
   if (alarm.name === COMMAND_ALARM_NAME) {
+    await expireFocus();
     await pollClassroomCommands();
     await refreshLearnerSession();
   }
@@ -64,14 +68,8 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
 
 async function apiConfig() {
   const config = await chrome.storage.local.get([
-    'apiBaseUrl',
-    'token',
-    'workstation_id',
-    'device_id',
-    'laboratory_id',
     'learner_session_id',
     'learner_session_started_at',
-    'learner_session_pinned',
     'rulesCount',
     'last_command_ids',
     'last_synced_at',
@@ -80,10 +78,16 @@ async function apiConfig() {
     'focus'
   ]);
 
-  return {
-    ...config,
-    apiBaseUrl: (config.apiBaseUrl || DEFAULT_BACKEND_URL).replace(/\/$/, '')
-  };
+  const managed = await chrome.storage.managed.get(['apiBaseUrl', 'token', 'workstation_id', 'device_id']);
+  const url = new URL(managed.apiBaseUrl);
+  const loopback = ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
+  if ((url.protocol !== 'https:' && !(url.protocol === 'http:' && loopback))
+      || url.username || url.password || url.search || url.hash
+      || !positiveInteger(managed.device_id) || !managed.workstation_id || !managed.token) {
+    throw new Error('Administrator-managed enrollment is missing or invalid.');
+  }
+
+  return { ...config, ...managed, apiBaseUrl: url.href.replace(/\/$/, '') };
 }
 
 async function apiFetch(path, options = {}) {
@@ -96,6 +100,9 @@ async function apiFetch(path, options = {}) {
 
   const response = await fetch(`${config.apiBaseUrl}${path}`, {
     ...options,
+    redirect: 'error',
+    credentials: 'omit',
+    cache: 'no-store',
     signal,
     headers: {
       Accept: 'application/json',
@@ -118,11 +125,12 @@ async function apiFetch(path, options = {}) {
 async function syncPoliciesFromDatabase() {
   try {
     const data = await apiFetch('/extension/sync');
+    validatePolicy(data);
     const currentRules = await chrome.declarativeNetRequest.getDynamicRules();
 
     await chrome.declarativeNetRequest.updateDynamicRules({
       removeRuleIds: currentRules.map((rule) => rule.id),
-      addRules: Array.isArray(data.dnr_rules) ? data.dnr_rules : []
+      addRules: data.dnr_rules
     });
 
     await chrome.storage.local.set({
@@ -161,13 +169,12 @@ async function syncPoliciesFromDatabase() {
  * Ask the server which learner is signed in at this workstation.
  *
  * Attribution should not depend on someone pasting a session identifier into
- * the options page, and a learner change must be picked up on its own. A
- * manually pinned session still wins, for the enrolment cases that need it.
+ * the options page, and a learner change must be picked up on its own. Enrollment and
+ * session attribution are controlled by the administrator and server.
  */
 async function refreshLearnerSession() {
   try {
     const config = await apiConfig();
-    if (config.learner_session_pinned) return;
     if (!config.device_id && !config.workstation_id) return;
 
     const query = config.device_id
@@ -228,7 +235,7 @@ async function pollClassroomCommands() {
     // Focus is state the server holds, with its own target, revision and
     // expiry. It is no longer inferred from whichever command happens to be
     // cached, so a lock without a target cannot read as a lock.
-    const focus = data.focus ?? { locked: false, url: null, revision: 0 };
+    const focus = activeFocus(data.focus);
     await chrome.storage.local.set({
       focus,
       focus_locked: Boolean(focus.locked),
@@ -331,11 +338,12 @@ chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
   if (details.frameId !== 0 || !isWebUrl(details.url)) return;
 
   try {
-    const config = await chrome.storage.local.get(['blocked_domains', 'allowed_domains', 'focus_locked', 'focus_url']);
+    const config = await chrome.storage.local.get(['blocked_domains', 'allowed_domains']);
+    const focus = await expireFocus();
     const destination = new URL(details.url);
 
-    if (config.focus_locked && isWebUrl(config.focus_url)) {
-      const focusUrl = new URL(config.focus_url);
+    if (focus.locked) {
+      const focusUrl = new URL(focus.url);
       if (destination.origin !== focusUrl.origin) {
         // Queued, never awaited: the redirect must not wait on the network.
         queueTelemetry(details.url, '', 'restrict', 'Classroom focus mode');
@@ -566,5 +574,53 @@ function positiveInteger(value) {
 }
 
 function isWebUrl(value) {
-  return typeof value === 'string' && (value.startsWith('https://') || value.startsWith('http://'));
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' || url.protocol === 'http:';
+  } catch (_) {
+    return false;
+  }
+}
+
+
+function activeFocus(focus) {
+  if (focus?.locked === true && isWebUrl(focus.url)
+      && Number.isFinite(Date.parse(focus.expires_at)) && Date.parse(focus.expires_at) > Date.now()) {
+    return focus;
+  }
+  return { locked: false, url: null, revision: focus?.revision ?? 0, expires_at: null };
+}
+
+async function expireFocus() {
+  const { focus } = await chrome.storage.local.get(['focus']);
+  const active = activeFocus(focus);
+  if (!active.locked) {
+    await chrome.storage.local.set({ focus: active, focus_locked: false, focus_url: null });
+  }
+  return active;
+}
+
+function validatePolicy(data) {
+  const domains = (values) => Array.isArray(values) && values.every((value) =>
+    typeof value === 'string' && value.length <= 253 && /^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$/.test(value));
+  if (!data || !Number.isSafeInteger(data.revision) || data.revision < 0
+      || !Number.isSafeInteger(data.institution_id) || data.institution_id < 1
+      || typeof data.content_hash !== 'string' || !/^[a-f0-9]{64}$/.test(data.content_hash)
+      || !domains(data.blocked_domains) || !domains(data.allowed_domains)
+      || !Array.isArray(data.dnr_rules) || data.dnr_rules.length === 0
+      || data.delivery?.client !== 'browser_extension' || typeof data.delivery.complete !== 'boolean'
+      || !Number.isSafeInteger(data.delivery.total_domains) || !Number.isSafeInteger(data.delivery.installed_domains)
+      || data.delivery.installed_domains !== data.blocked_domains.length
+      || data.delivery.total_domains < data.delivery.installed_domains
+      || !Number.isFinite(Date.parse(data.synced_at))) {
+    throw new Error('Invalid policy response; previous browser rules retained.');
+  }
+  const ids = new Set();
+  for (const rule of data.dnr_rules) {
+    if (!Number.isSafeInteger(rule?.id) || rule.id <= 0 || ids.has(rule.id)
+        || !['allow', 'block', 'redirect'].includes(rule.action?.type) || !rule.condition) {
+      throw new Error('Invalid browser rules; previous browser rules retained.');
+    }
+    ids.add(rule.id);
+  }
 }

@@ -204,7 +204,7 @@ class WorkstationSignInTest extends TestCase
     {
         $institution = Institution::factory()->create();
         $device = Device::factory()->for($institution)->create(['asset_tag' => 'LAB-A-07']);
-        $service = User::factory()->service($institution)->create();
+        $service = User::factory()->service($institution, $device)->create();
 
         Sanctum::actingAs($service, ['telemetry:write']);
 

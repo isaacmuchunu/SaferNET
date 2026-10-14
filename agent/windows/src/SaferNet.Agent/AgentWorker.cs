@@ -12,7 +12,7 @@ namespace SaferNet.Agent;
 /// stops the other, and a listener fault takes the service down for the
 /// recovery configured against it.
 /// </summary>
-public sealed class AgentWorker(PolicyStore policies, SaferNetApiClient api, DnsFilter dns, IOptions<AgentOptions> options, ILogger<AgentWorker> logger) : BackgroundService
+public sealed class AgentWorker(PolicyStore policies, SaferNetApiClient api, DnsFilter dns, BlockedDomainReporter reports, IOptions<AgentOptions> options, ILogger<AgentWorker> logger) : BackgroundService
 {
     private readonly AgentOptions _options = options.Value;
 
@@ -114,7 +114,7 @@ public sealed class AgentWorker(PolicyStore policies, SaferNetApiClient api, Dns
 
         try
         {
-            await api.SendHeartbeatAsync(policies.Current, health, cancellationToken);
+            await api.SendHeartbeatAsync(policies.Current, health, cancellationToken, reports.DroppedReports, reports.QueuedReports);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {

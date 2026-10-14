@@ -88,7 +88,7 @@ class LearnerBrowsingHistoryTest extends TestCase
 
         // A workstation may report activity; it has no business reading the
         // school's learners back out again.
-        $service = User::factory()->service($officer->institution)->create();
+        $service = User::factory()->service($officer->institution, $session->device)->create();
         Sanctum::actingAs($service, ['telemetry:write']);
 
         $this->getJson(route('api.v1.web-events.index'))->assertForbidden();
@@ -120,7 +120,7 @@ class LearnerBrowsingHistoryTest extends TestCase
         config(['app.timezone' => 'Africa/Nairobi', 'classroom.reporting_within_seconds' => 120]);
 
         [$officer, $session] = $this->lesson();
-        $service = User::factory()->service($officer->institution)->create();
+        $service = User::factory()->service($officer->institution, $session->device)->create();
         Sanctum::actingAs($service, ['telemetry:write']);
 
         // Exactly what the browser extension sends: new Date().toISOString().

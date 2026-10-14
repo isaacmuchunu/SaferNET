@@ -25,7 +25,7 @@ public sealed class SaferNetApiClient(HttpClient client, IOptions<AgentOptions> 
     /// when a policy was last actually installed, not when this heartbeat was
     /// sent, and the status comes from the resolver rather than being asserted.
     /// </summary>
-    public async Task SendHeartbeatAsync(FilterPolicy policy, AgentHealth health, CancellationToken cancellationToken)
+    public async Task SendHeartbeatAsync(FilterPolicy policy, AgentHealth health, CancellationToken cancellationToken, long droppedReports = 0, int queuedReports = 0)
     {
         using var response = await client.PostAsJsonAsync("protection-components", new
         {
@@ -44,22 +44,24 @@ public sealed class SaferNetApiClient(HttpClient client, IOptions<AgentOptions> 
                 dns_endpoints = health.Endpoints,
                 last_error = health.LastError,
                 machine = Environment.MachineName,
+                dropped_block_reports = droppedReports,
+                queued_block_reports = queuedReports,
             },
         }, cancellationToken);
         response.EnsureSuccessStatusCode();
     }
 
-    public async Task ReportBlockedDomainAsync(string domain, CancellationToken cancellationToken)
+    public async Task ReportBlockedDomainAsync(string domain, CancellationToken cancellationToken, Guid? eventId = null, DateTimeOffset? occurredAt = null)
     {
         using var response = await client.PostAsJsonAsync("security-events", new
         {
-            event_uuid = Guid.NewGuid(),
+            event_uuid = eventId ?? Guid.NewGuid(),
             device_id = _options.ManagedDeviceId,
             type = "dns_domain_blocked",
             severity = "medium",
             description = $"Endpoint DNS filter blocked {domain}",
             response = "NXDOMAIN",
-            occurred_at = DateTimeOffset.UtcNow,
+            occurred_at = occurredAt ?? DateTimeOffset.UtcNow,
             metadata = new { domain, workstation_id = _options.WorkstationId },
         }, cancellationToken);
         response.EnsureSuccessStatusCode();

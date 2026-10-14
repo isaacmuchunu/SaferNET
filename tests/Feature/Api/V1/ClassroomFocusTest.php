@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Api\V1;
 
+use App\Models\Device;
 use App\Models\Institution;
 use App\Models\Laboratory;
 use App\Models\User;
@@ -41,7 +42,7 @@ class ClassroomFocusTest extends TestCase
             'url' => 'https://kicd.ac.ke/lesson',
         ])->assertOk()->assertJsonPath('focus.locked', true);
 
-        Sanctum::actingAs(User::factory()->service($institution)->create(), ['telemetry:write']);
+        Sanctum::actingAs(User::factory()->service($institution, Device::factory()->for($institution)->create(['laboratory_id' => $laboratory->id]))->create(), ['telemetry:write']);
 
         $this->getJson(route('api.v1.extension.commands', ['laboratory_id' => $laboratory->id]))
             ->assertOk()
@@ -69,7 +70,7 @@ class ClassroomFocusTest extends TestCase
         // The revision advances, so a client can tell a release from silence.
         $this->assertSame(2, $released->json('focus.revision'));
 
-        Sanctum::actingAs(User::factory()->service($institution)->create(), ['telemetry:write']);
+        Sanctum::actingAs(User::factory()->service($institution, Device::factory()->for($institution)->create(['laboratory_id' => $laboratory->id]))->create(), ['telemetry:write']);
 
         $this->getJson(route('api.v1.extension.commands', ['laboratory_id' => $laboratory->id]))
             ->assertOk()
@@ -91,7 +92,7 @@ class ClassroomFocusTest extends TestCase
 
         $this->travel(10)->minutes();
 
-        Sanctum::actingAs(User::factory()->service($institution)->create(), ['telemetry:write']);
+        Sanctum::actingAs(User::factory()->service($institution, Device::factory()->for($institution)->create(['laboratory_id' => $laboratory->id]))->create(), ['telemetry:write']);
 
         $this->getJson(route('api.v1.extension.commands', ['laboratory_id' => $laboratory->id]))
             ->assertOk()
@@ -113,7 +114,7 @@ class ClassroomFocusTest extends TestCase
             'message' => 'Eyes on the board please.',
         ])->assertOk();
 
-        Sanctum::actingAs(User::factory()->service($institution)->create(), ['telemetry:write']);
+        Sanctum::actingAs(User::factory()->service($institution, Device::factory()->for($institution)->create(['laboratory_id' => $laboratory->id]))->create(), ['telemetry:write']);
 
         $response = $this->getJson(route('api.v1.extension.commands', ['laboratory_id' => $laboratory->id]))->assertOk();
 

@@ -21,7 +21,7 @@ extension/
 ├── background.js         # Core background service worker
 ├── content.js            # Content script for client-side injection
 ├── popup.html / .js / .css # Quick status popup for teachers/officers
-├── options.html / .js / .css # Workstation enrollment & token settings
+├── options.html / .js / .css # Read-only managed enrollment status
 ├── blocked.html / .js / .css # Friendly block & exception request page
 └── icons/                # High-resolution brand icons (16, 32, 48, 128 px)
 ```
@@ -60,3 +60,9 @@ Rather than requiring teachers to manually activate 40 workstations in the porta
 Learners cannot disable or remove the extension when deployed via enterprise policy:
 - **Registry Key**: `HKLM:\SOFTWARE\Policies\Google\Chrome\ExtensionInstallForcelist`
 - **Effect**: The extension icon cannot be uninstalled or disabled in `chrome://extensions`.
+
+### Managed Enrollment and Offline Enforcement
+
+Enrollment is supplied through Chrome's administrator-managed storage schema, not editable local storage. The Windows installer writes machine policy under `HKLM\SOFTWARE\Policies\Google\Chrome\3rdparty\extensions\<EXTENSION_ID>\policy`. Settings are `apiBaseUrl`, `token`, `device_id`, and `workstation_id`. The API requires an identity bound to one device; legacy school-wide tokens must be reissued with `--device=<DEVICE_ID>` after the additive migration.
+
+Malformed or failed policy responses retain the last installed rules. Focus mode checks its server expiry on navigation, startup, and command alarms, so a timed lock releases during an API outage. Browser and DNS allow rules take precedence over any matching block, including a blocked child beneath an allowed parent.

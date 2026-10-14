@@ -247,11 +247,11 @@ public sealed class DnsFilterServingTests
                 ImmutableHashSet<string>.Empty.WithComparer(StringComparer.OrdinalIgnoreCase), DateTimeOffset.UtcNow),
             CancellationToken.None).GetAwaiter().GetResult();
 
-        // Block reporting is fire-and-forget and its failure is only logged, so
-        // an unreachable API does not affect what these tests assert.
+        // Reports are queued without network work on the resolver path.
         var api = new SaferNetApiClient(new HttpClient { BaseAddress = new Uri("http://127.0.0.1:1/") }, options);
 
-        return new DnsFilter(policies, api, options, NullLogger<DnsFilter>.Instance);
+        var reports = new BlockedDomainReporter(api, options, NullLogger<BlockedDomainReporter>.Instance);
+        return new DnsFilter(policies, reports, options, NullLogger<DnsFilter>.Instance);
     }
 
     /// <summary>

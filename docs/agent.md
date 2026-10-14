@@ -65,7 +65,7 @@ The build script will:
 Before installing on a workstation, enroll the device and issue a service token from the management portal or CLI:
 ```bash
 php artisan safernet:enroll-device <INSTITUTION-CODE> LAB-01-PC-01 --laboratory="Lab 1"
-php artisan safernet:issue-service-token <INSTITUTION-CODE> --name="agent-LAB-01-PC-01"
+php artisan safernet:issue-service-token <INSTITUTION-CODE> --device=<DEVICE_ID> --name="agent-LAB-01-PC-01"
 ```
 
 ### 5.2 Interactive or Automated Installation

@@ -123,7 +123,13 @@ class ExtensionController extends Controller
             ]);
         }
 
-        return $learnerGroupId;
+        $device = $request->attributes->get('managed_device');
+        $activeGroup = $device->activeSessions()->with('learner')->first()?->learner?->learner_group_id;
+        if ($learnerGroupId !== null && $learnerGroupId !== $activeGroup) {
+            throw ValidationException::withMessages(['learner_group_id' => 'The learner group must match the signed-in learner.']);
+        }
+
+        return $activeGroup;
     }
 
     /**
@@ -275,6 +281,7 @@ class ExtensionController extends Controller
             ],
             'reason' => $session === null ? 'no_open_session' : null,
             'device_id' => $device->id,
+            'workstation_id' => $device->asset_tag,
             'checked_at' => now()->toISOString(),
         ]);
     }

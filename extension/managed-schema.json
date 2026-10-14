@@ -1,0 +1,21 @@
+{
+  "type": "object",
+  "properties": {
+    "apiBaseUrl": {
+      "type": "string",
+      "title": "Platform API URL"
+    },
+    "token": {
+      "type": "string",
+      "title": "Device-bound service token"
+    },
+    "device_id": {
+      "type": "integer",
+      "title": "Enrolled device ID"
+    },
+    "workstation_id": {
+      "type": "string",
+      "title": "Enrolled asset tag"
+    }
+  }
+}

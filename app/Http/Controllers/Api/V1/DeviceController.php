@@ -82,6 +82,7 @@ class DeviceController extends Controller
         $isUuid = Str::isUuid($identifier);
 
         $device = Device::withoutGlobalScopes()
+            ->whereKey($request->attributes->get('managed_device')->id)
             ->when($institutionId, fn ($q) => $q->where('institution_id', $institutionId))
             ->where(function ($query) use ($identifier, $isUuid) {
                 $query->where('asset_tag', $identifier)

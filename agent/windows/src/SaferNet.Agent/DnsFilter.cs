@@ -18,7 +18,7 @@ namespace SaferNet.Agent;
 /// resolver, and an upstream that times out is answered SERVFAIL rather than
 /// dropped, so the client fails fast instead of waiting out its own timeout.
 /// </summary>
-public sealed class DnsFilter(PolicyStore policies, SaferNetApiClient api, IOptions<AgentOptions> options, ILogger<DnsFilter> logger)
+public sealed class DnsFilter(PolicyStore policies, BlockedDomainReporter reports, IOptions<AgentOptions> options, ILogger<DnsFilter> logger)
 {
     private const int HeaderLength = 12;
 
@@ -331,9 +331,7 @@ public sealed class DnsFilter(PolicyStore policies, SaferNetApiClient api, IOpti
 
         if (policies.IsBlocked(domain))
         {
-            _ = api.ReportBlockedDomainAsync(domain, CancellationToken.None).ContinueWith(
-                task => logger.LogWarning(task.Exception, "Could not report DNS block for {Domain}", domain),
-                TaskContinuationOptions.OnlyOnFaulted);
+            reports.Enqueue(domain);
 
             return CreateAnswer(query, questionEnd, ResponseCode.NameError);
         }
