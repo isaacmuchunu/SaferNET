@@ -618,7 +618,7 @@ function validatePolicy(data) {
   const ids = new Set();
   for (const rule of data.dnr_rules) {
     if (!Number.isSafeInteger(rule?.id) || rule.id <= 0 || ids.has(rule.id)
-        || !['allow', 'block', 'redirect'].includes(rule.action?.type) || !rule.condition) {
+        || !['allow', 'block', 'redirect', 'modifyHeaders'].includes(rule.action?.type) || !rule.condition) {
       throw new Error('Invalid browser rules; previous browser rules retained.');
     }
     ids.add(rule.id);

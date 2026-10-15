@@ -79,6 +79,19 @@ test('a valid empty domain list installs system rules and a Chrome rejection pre
   assert.deepEqual(rejected.state.blocked_domains, ['old.example']);
 });
 
+test('the YouTube header rule from the API installs alongside search and domain rules', async () => {
+  const response = policy();
+  response.dnr_rules.push({
+    id: 3, priority: 10,
+    action: { type: 'modifyHeaders', requestHeaders: [{ header: 'YouTube-Restrict', operation: 'set', value: 'Strict' }] },
+    condition: { requestDomains: ['youtube.com', 'www.youtube.com', 'm.youtube.com'], resourceTypes: ['main_frame', 'sub_frame', 'xmlhttprequest'] },
+  });
+  const w = worker();
+  w.response(response);
+  assert.equal((await w.run('syncPoliciesFromDatabase()')).success, true);
+  assert.deepEqual(w.rules()[1].action.requestHeaders, response.dnr_rules[1].action.requestHeaders);
+});
+
 test('expired focus releases during offline navigation and after worker restart', async () => {
   const state = { focus_locked: true, focus_url: 'https://lesson.test/', focus: { locked: true, url: 'https://lesson.test/', expires_at: '2020-01-01T00:00:00Z' } };
   for (let restart = 0; restart < 2; restart++) {
